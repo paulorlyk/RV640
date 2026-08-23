@@ -1,3 +1,5 @@
 buildroot
+!buildroot/configs
+
 cmake-build-debug
 .idea
