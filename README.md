@@ -24,6 +24,8 @@ See `build.Dockerfile` for more details
 
 ## Running
 
+In the guest OS - login as `root` with no password.
+
 ### Linux
 ```bash
 cd linux
