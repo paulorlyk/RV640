@@ -3,3 +3,5 @@ buildroot
 
 cmake-build-debug
 .idea
+
+dist

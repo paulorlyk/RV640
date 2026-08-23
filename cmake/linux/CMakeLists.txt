@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.3)
+cmake_minimum_required(VERSION 3.31)
 project(RV640 C)
 
 set(CMAKE_C_STANDARD 11)
@@ -11,10 +11,15 @@ add_executable(${PROJECT_NAME}
 
 target_compile_options(${PROJECT_NAME} PRIVATE
     "-Wall"
+    "-static"
 #    "-g"
 #    "-O0"
 #    "-finline-functions"
 #    "-finline-functions-called-once"
+)
+
+target_link_options(${PROJECT_NAME} PRIVATE
+    "-static"
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

@@ -1,0 +1,10 @@
+.idea
+.git
+
+buildroot
+!buildroot/configs
+
+dist
+
+build.Dockerfile
+build.sh

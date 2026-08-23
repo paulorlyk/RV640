@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.3)
+cmake_minimum_required(VERSION 3.31)
 project(RV640 C)
 
 set(CMAKE_C_STANDARD 11)
