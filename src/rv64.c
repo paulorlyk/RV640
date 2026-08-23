@@ -1240,6 +1240,8 @@ void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {
 
   self->mstatus = MSTATUS_WR_VAL(0U);
 
+  self->irq = false;
+
   self->trap = false;
 
   self->mode = RV64_PRIV_MODE_MACHINE;
