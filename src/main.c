@@ -28,6 +28,15 @@ static struct {
 #endif
 } _opts;
 
+static struct {
+  Bus bus;
+  RV64_Cpu cpu;
+  Memory ram;
+  Aclint aclint;
+  Plic plic;
+  Ns16550a uart0;
+} _vm;
+
 static cpu_addr_t _loadDTB(const char* fileName, Memory *mem, cpu_addr_t memBase) {
   INFO("Reading DTB from %s", fileName);
 
@@ -129,7 +138,7 @@ static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t 
   return text_offset + memBase;
 }
 
-static inline bool _parseArgs(int argc, char* argv[]) {
+static bool _parseArgs(int argc, char* argv[]) {
   static struct option options[] = {
     {"dtb",     required_argument, 0, 'd'},
     {"kernel",  required_argument, 0, 'k'},
@@ -177,9 +186,8 @@ static inline bool _parseArgs(int argc, char* argv[]) {
   return true;
 }
 
-static inline void _usage(const char* exe) {
-  INFO("Usage:\n"
-    "  %s\n"
+static void _usage(const char* exe) {
+  INFO("Usage: %s\n"
     "    -d|--dtb file.dtb\n"
     "    -k|--kernel Image\n"
 #ifdef CONFIG_DOS
@@ -189,62 +197,85 @@ static inline void _usage(const char* exe) {
     exe);
 }
 
+static void _vmDestroy() {
+  rv64_destroy(&_vm.cpu);
+  bus_destroy(&_vm.bus);
+  mem_destroy(&_vm.ram);
+  ns16550a_destroy(&_vm.uart0);
+  plic_destroy(&_vm.plic);
+  aclint_destroy(&_vm.aclint);
+
+  ui_destroy();
+}
+
 int main(int argc, char* argv[]) {
   ui_init();
 
   if(!_parseArgs(argc, argv)) {
     _usage(argv[0]);
+    _vmDestroy();
     return 1;
   }
 
-  static Bus bus;
-  if(!bus_init(&bus))
+  if(!bus_init(&_vm.bus)) {
+    _vmDestroy();
     return 1;
+  }
 
-  static RV64_Cpu cpu;
-  if(!rv64_init(&cpu, &bus))
+  if(!rv64_init(&_vm.cpu, &_vm.bus)) {
+    _vmDestroy();
     return 1;
+  }
 
-  static RV64_Cpu *harts[] = { &cpu };
+  static RV64_Cpu *harts[] = { &_vm.cpu };
 
-  static Memory ram;
 #ifdef CONFIG_DOS
-  if(!mem_init(&ram, 32LL * 1024 * 1024, _opts.swapFile))
-    return 1;
+  if(!mem_init(&_vm.ram, 32LL * 1024 * 1024, _opts.swapFile)) {
 #else
-  if(!mem_init(&ram, 32LL * 1024 * 1024))
-    return 1;
+  if(!mem_init(&_vm.ram, 32LL * 1024 * 1024)) {
 #endif
+    _vmDestroy();
+    return 1;
+  }
 
   const cpu_addr_t ramBase = 0x80000000;
 
-  const cpu_addr_t dtbAddress = _loadDTB(_opts.dtbFile, &ram, ramBase);
-  if(!dtbAddress)
+  const cpu_addr_t dtbAddress = _loadDTB(_opts.dtbFile, &_vm.ram, ramBase);
+  if(!dtbAddress) {
+    _vmDestroy();
     return 1;
+  }
 
-  const cpu_addr_t kernelEntryPoint = _loadLinuxImage(_opts.kernelFile, &ram, ramBase);
-  if(!kernelEntryPoint)
+  const cpu_addr_t kernelEntryPoint = _loadLinuxImage(_opts.kernelFile, &_vm.ram, ramBase);
+  if(!kernelEntryPoint) {
+    _vmDestroy();
     return 1;
+  }
 
-  if(!bus_register(&bus, ramBase, mem_device(&ram)))
+  if(!bus_register(&_vm.bus, ramBase, mem_device(&_vm.ram))) {
+    _vmDestroy();
     return 1;
+  }
 
-  static Aclint aclint;
-  if(!aclint_init(&aclint, harts) || !bus_register(&bus, 0x2000000, aclint_device(&aclint)))
+  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, 0x2000000, aclint_device(&_vm.aclint))) {
+    _vmDestroy();
     return 1;
+  }
 
-  static Plic plic;
-  if(!plic_init(&plic) || !bus_register(&bus, 0xC000000, plic_device(&plic)))
+  if(!plic_init(&_vm.plic) || !bus_register(&_vm.bus, 0xC000000, plic_device(&_vm.plic))) {
+    _vmDestroy();
     return 1;
+  }
 
-  static Ns16550a uart0;
-  if(!ns16550a_init(&uart0) || !bus_register(&bus, 0x10000000, ns16550_device(&uart0)))
+  if(!ns16550a_init(&_vm.uart0) || !bus_register(&_vm.bus, 0x10000000, ns16550_device(&_vm.uart0))) {
+    _vmDestroy();
     return 1;
+  }
 
   INFO("Resetting the CPU...");
-  rv64_reset(&cpu, kernelEntryPoint);
-  rv64_setRx(&cpu, CPU_REG_A0, 0);  // hart id
-  rv64_setRx(&cpu, CPU_REG_A1, dtbAddress);
+  rv64_reset(&_vm.cpu, kernelEntryPoint);
+  rv64_setRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
+  rv64_setRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
 
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
@@ -261,12 +292,12 @@ int main(int argc, char* argv[]) {
     const int cyclesPerStep = 64;
 
     for(int i = 0; i < cyclesPerStep; ++i) {
-      if(rv64_isWFI(&cpu))
+      if(rv64_isWFI(&_vm.cpu))
         break;
 
-      rv64_run(&cpu);
+      rv64_run(&_vm.cpu);
     }
-    aclint_tick(&aclint, cyclesPerStep);
+    aclint_tick(&_vm.aclint, cyclesPerStep);
     cyclesAcc += cyclesPerStep;
 
     if(cyclesAcc > 5000) {
@@ -285,21 +316,15 @@ int main(int argc, char* argv[]) {
 
     const char ch = ui_getch();
     if(ch)
-      ns16550_push(&uart0, ch);
+      ns16550_push(&_vm.uart0, ch);
   }
 
   clock_t now = clock();
   clock_t dur = now - ts;
   runtime_ms += dur / (CLOCKS_PER_SEC / 1000);
   putc('\n', stderr);
-  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv64_getPC(&cpu));
+  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv64_getPC(&_vm.cpu));
 
-  rv64_destroy(&cpu);
-  bus_destroy(&bus);
-  mem_destroy(&ram);
-  ns16550a_destroy(&uart0);
-  plic_destroy(&plic);
-  aclint_destroy(&aclint);
-
+  _vmDestroy();
   return 0;
 }

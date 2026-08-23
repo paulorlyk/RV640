@@ -33,18 +33,31 @@ void inline _pokeVideoMem(int offset, uint16_t data) {
 #include <fcntl.h>
 #include <stdio.h>
 
+static struct {
+  struct termios tio;
+} _ui;
+
 #endif
 
 void ui_init() {
 #ifndef CONFIG_DOS
-  struct termios tio;
-  tcgetattr(STDIN_FILENO, &tio);
+  tcgetattr(STDIN_FILENO, &_ui.tio);
 
+  struct termios tio = _ui.tio;
   tio.c_lflag &= ~(ICANON | ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &tio);
 
   int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
   fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+#endif
+}
+
+void ui_destroy() {
+#ifndef CONFIG_DOS
+  tcsetattr(STDIN_FILENO, TCSANOW, &_ui.tio);
+
+  int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+  fcntl(STDIN_FILENO, F_SETFL, flags & ~O_NONBLOCK);
 #endif
 }
 

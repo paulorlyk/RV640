@@ -14,6 +14,7 @@ typedef enum {
 } UIPageStatus;
 
 void ui_init();
+void ui_destroy();
 
 void ui_rerender();
 
