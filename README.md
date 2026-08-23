@@ -24,6 +24,12 @@ See `build.Dockerfile` for more details
 
 ## Running
 
+To test the Linux image in qemu:
+
+```bash
+qemu-system-riscv64 -nographic -cpu rv64,mmu=false -m 32M -machine virt -bios none -kernel Image
+```
+
 In the guest OS - login as `root` with no password.
 
 ### Linux
