@@ -136,7 +136,7 @@ static inline void _translateCextQ1(unsigned int instr, struct _instr *di) {
         // c.addiw -> addiw rd, rd, imm
         const uint32_t imm = ((instr >> 2) & 0x1FLU) | ((instr >> 7) & (1LU << 5));
 
-        di->opcode = 0x1b;
+        di->opcode = 0x1B;
         di->funct3 = 0;
         di->rd = rd;
         di->rs1 = rd;
@@ -244,7 +244,7 @@ static inline void _translateCextQ1(unsigned int instr, struct _instr *di) {
               default:
               case 0: {
                 // c.subw -> subw rd′, rd′, rs2′
-                di->opcode = 0x3b;
+                di->opcode = 0x3B;
                 di->funct3 = 0;
                 di->funct7 = 32;
                 di->rd = rd;
@@ -255,7 +255,7 @@ static inline void _translateCextQ1(unsigned int instr, struct _instr *di) {
 
               case 1: {
                 // c.addw -> addw rd′, rd′, rs2′
-                di->opcode = 0x3b;
+                di->opcode = 0x3B;
                 di->funct3 = 0;
                 di->funct7 = 0;
                 di->rd = rd;

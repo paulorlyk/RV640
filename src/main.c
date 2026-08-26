@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
 
   for(long int cyclesAcc = 0;;) {
 #ifdef MAX_CYCLES
-    if(aclint_mtime(&aclint) >= MAX_CYCLES)
+    if(aclint_mtime(&_vm.aclint) >= MAX_CYCLES)
       break;
 #endif
 

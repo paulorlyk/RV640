@@ -24,15 +24,15 @@ target_compile_options(${EXECUTABLE_8086} PRIVATE
     "-O3"
 
     "-g0"
-#        "-mno-segment-relocation-stuff"
-#        "-mshort-jumps"
-#        "-mrtd"
-#        "-mregparmcall"
+#    "-mno-segment-relocation-stuff"
+#    "-mshort-jumps"
+#    "-mrtd"
+#    "-mregparmcall"
 
-#        "-mnewlib-nano-stdio"
+#    "-mnewlib-nano-stdio"
 
     "-masm=intel"
-#        "-S"
+#    "-S"
 )
 
 target_link_libraries(${EXECUTABLE_8086} PRIVATE
@@ -42,11 +42,11 @@ target_link_libraries(${EXECUTABLE_8086} PRIVATE
 target_link_options(${EXECUTABLE_8086} PRIVATE
     "-mcmodel=medium"
     "-flto"
-#        "-mnewlib-nano-stdio"
+#    "-mnewlib-nano-stdio"
 )
 
 target_compile_definitions(${EXECUTABLE_8086} PRIVATE
-#        NDEBUG
+#    NDEBUG
     CONFIG_DOS=1
 )
 
