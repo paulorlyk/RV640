@@ -19,32 +19,37 @@ static inline void _dirtyPage(struct _memPage *page) {
   page->dirty = true;
 }
 
-static inline void _cachePage(Memory* self, struct _memPage *page) {
-#if MEM_LOOKUP_CACHED_PAGES > 0
-  self->cachedPagesEvictCtr = (self->cachedPagesEvictCtr + 1) % MEM_LOOKUP_CACHED_PAGES;
-  self->cachedPages[self->cachedPagesEvictCtr] = page;
-#endif
+static inline void _swapLruHead(Memory* self, struct _memPage *page) {
+  if(page->prev)
+    page->prev->next = page->next;
+  if(page->next)
+    page->next->prev = page->prev;
+
+  page->next = self->lruListHead;
+  page->prev = NULL;
+
+  self->lruListHead->prev = page;
+  self->lruListHead = page;
 }
 
-static inline void _evictPage(Memory* self, struct _memPage *page) {
-  if(page->dirty) {
-    // DEBUG("Mem: evicting page: addr = %lX dirty = %d", page->addr, page->dirty);
-
-    if(fseek(self->swap, (long int)page->addr, SEEK_SET) != 0) {
-      ERROR("Mem: Failed to seek swap");
-      return;
-    }
-
-    _fmemcpy(self->localPage, page->data, MEM_PAGE_SIZE);
-
-    if(fwrite(self->localPage, MEM_PAGE_SIZE, 1, self->swap) != 1) {
-      ERROR("Mem: Failed to write page to swap");
-      return;
-    }
+static inline void _storePage(Memory* self, struct _memPage *page) {
+  if(!page->dirty)
+    return;
 
 #ifdef MEMORY_STATS
-    ++self->pageWrites;
+  ++self->pageWrites;
 #endif
+
+  if(fseek(self->swap, (long int)page->addr, SEEK_SET) != 0) {
+    ERROR("Mem: Failed to seek swap");
+    return;
+  }
+
+  _fmemcpy(self->localPage, page->data, MEM_PAGE_SIZE);
+
+  if(fwrite(self->localPage, MEM_PAGE_SIZE, 1, self->swap) != 1) {
+    ERROR("Mem: Failed to write page to swap");
+    return;
   }
 
   page->dirty = false;
@@ -74,53 +79,39 @@ static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr)
 
   const unsigned long int pageAddr = addr & MEM_PAGE_ADDR_MASK;
 
-  // DEBUG("Mem: page lookup: addr = %lX pageAddr = %lX", addr, pageAddr);
-  struct _memPage *page = NULL;
-
-#if MEM_LOOKUP_CACHED_PAGES > 0
-  for(int i = 0; i < MEM_LOOKUP_CACHED_PAGES; ++i) {
-    page = self->cachedPages[i];
+  struct _memPage *page = self->lruListHead;
+  for(;;) {
     if(page->addr == pageAddr) {
-#ifdef MEMORY_STATS
-      ++self->cacheHits;
-#endif
-      return page;
-    }
-  }
-#endif
-
-#ifdef MEMORY_STATS
-  ++self->cacheMisses;
-#endif
-
-  for(int i = 0; i < MEM_PAGES; ++i) {
-    page = self->pages + i;
-    if(page->addr == pageAddr) {
-      _cachePage(self, page);
 #ifdef MEMORY_STATS
       ++self->pageHits;
 #endif
+
+      if(page != self->lruListHead)
+        _swapLruHead(self, page);
+
       return page;
     }
+
+    if(!page->next)
+      break;
+
+    page = page->next;
   }
 
 #ifdef MEMORY_STATS
   ++self->pageMisses;
 #endif
 
-  const int evictPageIdx = self->evictCtr = (self->evictCtr + 1) % MEM_PAGES;
-  page = self->pages + evictPageIdx;
+  _swapLruHead(self, page);
 
   ui_page_status(UI_PS_WR);
-  _evictPage(self, page);
+  _storePage(self, page);
 
-  // DEBUG("Mem: loading page %d addr = %lX", evictPageIdx, pageAddr);
   ui_page_status(UI_PS_RD);
   _loadPage(self, pageAddr, page);
 
   ui_page_status(UI_PS_IDLE);
 
-  _cachePage(self, page);
   return page;
 }
 
@@ -194,8 +185,12 @@ bool mem_init(Memory* self, cpu_size_t size)
     _loadPage(self, MEM_PAGE_SIZE * i, &self->pages[i]);
     ui_page_status(UI_PS_IDLE);
 
-    _cachePage(self, &self->pages[i]);
+    if(i < MEM_PAGES - 1)
+      self->pages[i].next = &self->pages[i + 1];
+    if(i > 0)
+      self->pages[i].prev = &self->pages[i - 1];
   }
+  self->lruListHead = &self->pages[0];
 #else
   self->data = calloc(size, 1);
   if(!self->data) {
@@ -216,7 +211,7 @@ void mem_destroy(Memory *self) {
 #ifdef CONFIG_DOS
   for(int i = 0; i < MEM_PAGES; ++i) {
     if(self->swap && self->localPage)
-      _evictPage(self, self->pages + i);
+      _storePage(self, self->pages + i);
 
     _ffree(self->pages[i].data);
   }
@@ -227,8 +222,8 @@ void mem_destroy(Memory *self) {
   free(self->localPage);
 
 #ifdef MEMORY_STATS
-  DEBUG("Mem stats:\n\tpageLookups:\t%" PRIu32 "\n\tcacheHits:\t%" PRIu32 "\n\tcacheMisses:\t%" PRIu32 "\n\tpageHits:\t%" PRIu32 "\n\tpageMisses:\t%" PRIu32 "\n\tpageWrites:\t%" PRIu32,
-    self->pageLookups, self->cacheHits, self->cacheMisses, self->pageHits, self->pageMisses, self->pageWrites);
+  DEBUG("Mem stats:\n\tpageLookups:\t%" PRIu32 "\n\tpageHits:\t%" PRIu32 "\n\tpageMisses:\t%" PRIu32 "\n\tpageWrites:\t%" PRIu32,
+    self->pageLookups, self->pageHits, self->pageMisses, self->pageWrites);
 #endif
 #else
   free(self->data);

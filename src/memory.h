@@ -27,8 +27,6 @@
 
 #define MEM_SWAP_IO_BUF_SIZE 4096
 
-#define MEM_LOOKUP_CACHED_PAGES   4
-
 #endif
 
 typedef struct {
@@ -37,21 +35,17 @@ typedef struct {
     unsigned long int addr;   // No need to keep long pointers because of file system limitations
     bool dirty;
     char __far* data;
-  } pages[MEM_PAGES];
-  int evictCtr; // Yes, this is somehow faster than a proper LRU...
 
-#if MEM_LOOKUP_CACHED_PAGES > 0
-  struct _memPage *cachedPages[MEM_LOOKUP_CACHED_PAGES];
-  int cachedPagesEvictCtr;
-#endif
+    struct _memPage *next;
+    struct _memPage *prev;
+  } pages[MEM_PAGES];
+  struct _memPage *lruListHead;
 
   FILE *swap;
   uint8_t *localPage;
 
 #ifdef MEMORY_STATS
   uint32_t pageLookups;
-  uint32_t cacheHits;
-  uint32_t cacheMisses;
   uint32_t pageHits;
   uint32_t pageMisses;
   uint32_t pageWrites;
