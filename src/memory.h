@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+// #define MEMORY_STATS
+
 #ifdef CONFIG_DOS
 
 #include <stdio.h>
@@ -45,6 +47,15 @@ typedef struct {
 
   FILE *swap;
   uint8_t *localPage;
+
+#ifdef MEMORY_STATS
+  uint32_t pageLookups;
+  uint32_t cacheHits;
+  uint32_t cacheMisses;
+  uint32_t pageHits;
+  uint32_t pageMisses;
+  uint32_t pageWrites;
+#endif
 #else
   char *data;
 #endif

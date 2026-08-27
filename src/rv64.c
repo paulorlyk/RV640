@@ -301,6 +301,14 @@ static inline uint32_t _fetch(RV64_Cpu *self) {
 
     // Cache line loaded, we are at the start of the cache line
     offset = 0;
+
+#ifdef CPU_STATS
+    ++self->icacheMisses;
+#endif
+  } else {
+#ifdef CPU_STATS
+    ++self->icacheHits;
+#endif
   }
 
   memcpy(&res, self->icache.line + offset, sizeof(res));
@@ -1225,6 +1233,11 @@ bool rv64_init(RV64_Cpu* self, Bus *bus) {
 
 void rv64_destroy(RV64_Cpu *self) {
   (void)self;
+
+#ifdef CPU_STATS
+  DEBUG("CPU stats:\n\ticacheHits:\t%" PRIu32 "\n\ticacheMisses:\t%" PRIu32,
+    self->icacheHits, self->icacheMisses);
+#endif
 }
 
 void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {

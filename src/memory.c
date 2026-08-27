@@ -41,6 +41,10 @@ static inline void _evictPage(Memory* self, struct _memPage *page) {
       ERROR("Mem: Failed to write page to swap");
       return;
     }
+
+#ifdef MEMORY_STATS
+    ++self->pageWrites;
+#endif
   }
 
   page->dirty = false;
@@ -64,6 +68,10 @@ static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _m
 }
 
 static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr) {
+#ifdef MEMORY_STATS
+  ++self->pageLookups;
+#endif
+
   const unsigned long int pageAddr = addr & MEM_PAGE_ADDR_MASK;
 
   // DEBUG("Mem: page lookup: addr = %lX pageAddr = %lX", addr, pageAddr);
@@ -72,18 +80,33 @@ static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr)
 #if MEM_LOOKUP_CACHED_PAGES > 0
   for(int i = 0; i < MEM_LOOKUP_CACHED_PAGES; ++i) {
     page = self->cachedPages[i];
-    if(page->addr == pageAddr)
+    if(page->addr == pageAddr) {
+#ifdef MEMORY_STATS
+      ++self->cacheHits;
+#endif
       return page;
+    }
   }
+#endif
+
+#ifdef MEMORY_STATS
+  ++self->cacheMisses;
 #endif
 
   for(int i = 0; i < MEM_PAGES; ++i) {
     page = self->pages + i;
     if(page->addr == pageAddr) {
       _cachePage(self, page);
+#ifdef MEMORY_STATS
+      ++self->pageHits;
+#endif
       return page;
     }
   }
+
+#ifdef MEMORY_STATS
+  ++self->pageMisses;
+#endif
 
   const int evictPageIdx = self->evictCtr = (self->evictCtr + 1) % MEM_PAGES;
   page = self->pages + evictPageIdx;
@@ -202,6 +225,11 @@ void mem_destroy(Memory *self) {
     fclose(self->swap);
 
   free(self->localPage);
+
+#ifdef MEMORY_STATS
+  DEBUG("Mem stats:\n\tpageLookups:\t%" PRIu32 "\n\tcacheHits:\t%" PRIu32 "\n\tcacheMisses:\t%" PRIu32 "\n\tpageHits:\t%" PRIu32 "\n\tpageMisses:\t%" PRIu32 "\n\tpageWrites:\t%" PRIu32,
+    self->pageLookups, self->cacheHits, self->cacheMisses, self->pageHits, self->pageMisses, self->pageWrites);
+#endif
 #else
   free(self->data);
 #endif

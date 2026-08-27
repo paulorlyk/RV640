@@ -15,6 +15,8 @@
 #endif
 #endif
 
+// #define CPU_STATS
+
 #define ICACHE_LINE_SIZE (128U)
 
 typedef struct {
@@ -83,6 +85,11 @@ typedef struct {
   } icache;
 
   RV64_PrivMode mode;
+
+#ifdef CPU_STATS
+  uint32_t icacheHits;
+  uint32_t icacheMisses;
+#endif
 } RV64_Cpu;
 
 bool rv64_init(RV64_Cpu* self, Bus *bus);
