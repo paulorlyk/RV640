@@ -8,7 +8,6 @@
 #include "../ui.h"
 
 #include <string.h>
-#include <ctype.h>
 
 static inline int _incBufIdx(int idx) {
   return (idx + 1) % NS16550A_BUF_SIZE;
@@ -59,9 +58,7 @@ static void _cbWrite(void *opaque, cpu_addr_t addr, const void* buf, size_t size
 
       case 0: {
         // Transmitter Holding Register
-        char c = (char)reg[i];
-        if(isprint(c) || isspace(c))
-          ui_putch(c);
+        ui_putch((char)reg[i]);
         break;
       }
 

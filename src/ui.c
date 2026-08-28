@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <conio.h>
 #include <stdio.h>
+#include <ctype.h>
 
 uint16_t _statusLine[80] = {};
 
@@ -138,6 +139,11 @@ char ui_getch() {
 }
 
 void ui_putch(char c) {
+#ifdef CONFIG_DOS
+  if(!isprint(c) && !isspace(c))
+    return;
+#endif
+
   putc(c, stdout);
   fflush(stdout);
 
