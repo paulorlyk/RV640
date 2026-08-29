@@ -231,9 +231,6 @@ void mem_destroy(Memory *self) {
 }
 
 void mem_read(Memory *self, cpu_addr_t addr, void* buf, size_t size) {
-  assert(addr < self->dev.size);
-  assert(size <= self->dev.size - addr);
-
 #ifdef CONFIG_DOS
   unsigned long int localAddr = (unsigned long int)addr;
 
@@ -252,14 +249,14 @@ void mem_read(Memory *self, cpu_addr_t addr, void* buf, size_t size) {
     localAddr += chunkSize;
   }
 #else
+  assert(addr < self->dev.size);
+  assert(size <= self->dev.size - addr);
+
   memcpy(buf, self->data + addr, size);
 #endif
 }
 
 void mem_write(Memory *self, cpu_addr_t addr, const void* buf, size_t size) {
-  assert(addr < self->dev.size);
-  assert(size <= self->dev.size - addr);
-
 #ifdef CONFIG_DOS
   unsigned long int localAddr = (unsigned long int)addr;
 
@@ -280,14 +277,14 @@ void mem_write(Memory *self, cpu_addr_t addr, const void* buf, size_t size) {
     localAddr += chunkSize;
   }
 #else
+  assert(addr < self->dev.size);
+  assert(size <= self->dev.size - addr);
+
   memcpy(self->data + addr, buf, size);
 #endif
 }
 
 int mem_cmp(Memory *self, cpu_addr_t addr, const void *buf, size_t size) {
-  assert(addr < self->dev.size);
-  assert(size <= self->dev.size - addr);
-
 #ifdef CONFIG_DOS
   int res = 0;
 
@@ -312,6 +309,9 @@ int mem_cmp(Memory *self, cpu_addr_t addr, const void *buf, size_t size) {
 
   return res;
 #else
+  assert(addr < self->dev.size);
+  assert(size <= self->dev.size - addr);
+
   return memcmp(self->data + addr, buf, size);
 #endif
 }
