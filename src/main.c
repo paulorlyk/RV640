@@ -262,7 +262,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(!plic_init(&_vm.plic) || !bus_register(&_vm.bus, 0xC000000, plic_device(&_vm.plic))) {
+  if(!plic_init(&_vm.plic, harts) || !bus_register(&_vm.bus, 0xC000000, plic_device(&_vm.plic))) {
     _vmDestroy();
     return 1;
   }
