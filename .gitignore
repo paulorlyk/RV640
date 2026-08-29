@@ -1,5 +1,6 @@
 buildroot
 !buildroot/configs
+!buildroot/rootfs-overlay
 
 cmake-build-debug
 .idea

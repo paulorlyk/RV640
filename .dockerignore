@@ -3,6 +3,7 @@
 
 buildroot
 !buildroot/configs
+!buildroot/rootfs-overlay
 
 dist
 

@@ -60,7 +60,7 @@ RUN wget "https://buildroot.org/downloads/buildroot-2026.05.1.tar.gz" && \
     tar -xzvf buildroot-2026.05.1.tar.gz && \
     mv buildroot-2026.05.1 buildroot
 
-COPY buildroot/configs configs
+COPY buildroot/ .
 
 RUN cp configs/.config buildroot/
 
