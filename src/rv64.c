@@ -79,6 +79,9 @@ static inline cpu_word_t _readCSR(RV64_Cpu *self, uint16_t csr) {
     // MTVEC
     case 0x305: return self->mtvec;
 
+    // MENVCFG
+    case 0x30A: return self->menvcfg;
+
     // MSCRATCH
     case 0x340: return self->mscratch;
 
@@ -148,6 +151,12 @@ static inline void _writeCSR(RV64_Cpu *self, uint16_t csr, cpu_word_t val) {
     case 0x305: {
       // MTVEC
       self->mtvec = val;
+      break;
+    }
+
+    case 0x30A: {
+      // MENVCFG
+      self->menvcfg = val;
       break;
     }
 
@@ -478,6 +487,30 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
       } else {
         _trap(self, MCAUSE_INST_ILL, false);
         assert(false);
+      }
+      break;
+    }
+
+    case 2: {
+      // CBO
+      switch(di->funct12) {
+        default: {
+          _trap(self, MCAUSE_INST_ILL, false);
+          assert(false);
+          break;
+        }
+
+        case 4: {
+          // CBO.ZERO
+          if(!di->rd) {
+            static const uint8_t zero[DCACHE_LINE_SIZE] = {0};
+            _writeMem(self, _readReg(self, di->rs1), zero, sizeof(zero));
+          } else {
+            _trap(self, MCAUSE_INST_ILL, false);
+            assert(false);
+          }
+          break;
+        }
       }
       break;
     }

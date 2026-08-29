@@ -18,6 +18,7 @@
 // #define CPU_STATS
 
 #define ICACHE_LINE_SIZE (128U)
+#define DCACHE_LINE_SIZE (128U)
 
 typedef struct {
   union {
@@ -67,6 +68,7 @@ typedef struct {
   cpu_word_t mcause;  // Machine Cause
   cpu_word_t mepc;  // Machine Exception Program Counter Register
   cpu_word_t mtval; // Machine Trap Value Register
+  cpu_word_t menvcfg; // Machine Environment Configuration Register
 
   bool trap;
   bool irq;
