@@ -139,11 +139,11 @@ static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t 
 }
 
 static bool _parseArgs(int argc, char* argv[]) {
-  static struct option options[] = {
-    {"dtb",     required_argument, 0, 'd'},
-    {"kernel",  required_argument, 0, 'k'},
+  static const struct option options[] = {
+    { .name = "dtb",    .has_arg = required_argument, .flag = 0, .val = 'd'},
+    { .name = "kernel", .has_arg = required_argument, .flag = 0, .val = 'k'},
 #ifdef CONFIG_DOS
-    {"swap",    required_argument, 0, 's'},
+    { .name = "swap", .has_arg = required_argument,   .flag = 0, .val = 's' },
 #endif
     {0},
   };
@@ -301,8 +301,8 @@ int main(int argc, char* argv[]) {
     cyclesAcc += cyclesPerStep;
 
     if(cyclesAcc > 5000) {
-      clock_t now = clock();
-      clock_t dur = now - ts;
+      const clock_t now = clock();
+      const clock_t dur = now - ts;
       if(dur >= CLOCKS_PER_SEC) {
         runtime_ms += dur / (CLOCKS_PER_SEC / 1000);
 
@@ -319,8 +319,8 @@ int main(int argc, char* argv[]) {
       ns16550_push(&_vm.uart0, ch);
   }
 
-  clock_t now = clock();
-  clock_t dur = now - ts;
+  const clock_t now = clock();
+  const clock_t dur = now - ts;
   runtime_ms += dur / (CLOCKS_PER_SEC / 1000);
   putc('\n', stderr);
   DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv64_getPC(&_vm.cpu));
