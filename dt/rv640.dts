@@ -66,8 +66,8 @@
 
 		uart0: serial@10000000 {
 			compatible = "ns16550a";
-//			interrupts = <10>;
-//			interrupt-parent = <&plic>;
+			interrupts = <1>;
+			interrupt-parent = <&plic>;
 			reg = <0x0 0x10000000 0x0 0x100>;
 			reg-shift = <0>;
 			reg-io-width = <1>;

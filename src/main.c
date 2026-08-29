@@ -267,7 +267,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(!ns16550a_init(&_vm.uart0) || !bus_register(&_vm.bus, 0x10000000, ns16550_device(&_vm.uart0))) {
+  if(!ns16550a_init(&_vm.uart0, &_vm.plic) || !bus_register(&_vm.bus, 0x10000000, ns16550_device(&_vm.uart0))) {
     _vmDestroy();
     return 1;
   }
