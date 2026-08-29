@@ -139,11 +139,6 @@ char ui_getch() {
 }
 
 void ui_putch(char c) {
-#ifdef CONFIG_DOS
-  if(!isprint(c) && !isspace(c))
-    return;
-#endif
-
   putc(c, stdout);
   fflush(stdout);
 
