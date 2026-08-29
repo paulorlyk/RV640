@@ -319,11 +319,13 @@ int main(int argc, char* argv[]) {
       ns16550_push(&_vm.uart0, ch);
   }
 
+#ifdef MAX_CYCLES
   const clock_t now = clock();
   const clock_t dur = now - ts;
   runtime_ms += dur / (CLOCKS_PER_SEC / 1000);
   putc('\n', stderr);
   DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv64_getPC(&_vm.cpu));
+#endif
 
   _vmDestroy();
   return 0;
