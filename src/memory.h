@@ -16,7 +16,7 @@
 
 #include <stdio.h>
 
-#define MEM_PAGES 64
+#define MEM_PAGES 80
 
 #define MEM_PAGE_ADDR_SHIFT 12U
 
