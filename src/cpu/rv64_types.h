@@ -17,8 +17,6 @@ typedef uint64_t cpu_size_t;
 #define CPU_UINT_MAX (~(cpu_word_t)0)
 
 struct _instr {
-  uint32_t instr;
-  unsigned int opcode;
   unsigned int size;
   unsigned int funct3;
   unsigned int funct5;
