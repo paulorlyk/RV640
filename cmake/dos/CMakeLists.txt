@@ -21,7 +21,7 @@ target_compile_options(${EXECUTABLE_8086} PRIVATE
     "-march=i8086"
     "-mmsdos"
     "-mcmodel=medium"
-    "-O3"
+    "-Os"
 
     "-g0"
 #    "-mno-segment-relocation-stuff"
