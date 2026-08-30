@@ -5,7 +5,7 @@
 
 #include "bus.h"
 #include "memory.h"
-#include "rv64.h"
+#include "cpu/rv64.h"
 #include "dev/ns16550a.h"
 #include "dev/plic.h"
 #include "dev/aclint.h"

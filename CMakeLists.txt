@@ -10,6 +10,8 @@ file(GLOB GLOB_SOURCES
     src/*.c
     src/dev/*.h
     src/dev/*.c
+    src/cpu/*.h
+    src/cpu/*.c
 )
 
 set(SOURCES "${GLOB_SOURCES}")

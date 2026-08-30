@@ -6,7 +6,7 @@
 #define RV64_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
 
 #include "rv64_types.h"
-#include "bus.h"
+#include "../bus.h"
 
 #ifndef CONFIG_DOS
 #include <endian.h>

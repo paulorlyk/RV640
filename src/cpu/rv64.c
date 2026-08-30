@@ -4,8 +4,8 @@
 
 #include "rv64.h"
 
-#include "log.h"
-#include "utils.h"
+#include "../log.h"
+#include "../utils.h"
 
 #include "rv_cext.h"
 

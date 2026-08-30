@@ -6,7 +6,7 @@
 #define PLIC_H_E5E4A5FAA02944E8B4BA0095454426CF
 
 #include "device.h"
-#include "../rv64.h"
+#include "../cpu/rv64.h"
 
 #define PLIC_HARTS 1
 

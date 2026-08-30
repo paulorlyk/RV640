@@ -4,8 +4,8 @@
 
 #include "rv_cext.h"
 
-#include "log.h"
-#include "utils.h"
+#include "../log.h"
+#include "../utils.h"
 
 #include <assert.h>
 

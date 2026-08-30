@@ -6,7 +6,7 @@
 #define ACLINT_H_1EB7E96A572247C5ABBBCD05B33CCB6C
 
 #include "device.h"
-#include "../rv64.h"
+#include "../cpu/rv64.h"
 
 #define ACLINT_HARTS 1
 
