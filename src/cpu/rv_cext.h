@@ -23,7 +23,7 @@ static inline void _cextNop(RV64_Cpu* self, struct _instr *di) {
   _doOPIMM(self, di);
 }
 
-static inline void _translateCextQ0_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const uint32_t imm = ((instr >> 2) & (1LU << 3)) | ((instr >> 4) & (1LU << 2)) | ((instr >> 1) & (1LU << 2)) | ((instr >> 1) & (0xFLU << 6)) | ((instr >> 7) & (0x3LU << 4));
   if(imm) {
     // c.addi4spn -> addi rd′, x2, imm[9:2]
@@ -39,14 +39,14 @@ static inline void _translateCextQ0_0(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ0_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   (void)instr;
 
   // ???
   _doILL(self, di);
 }
 
-static inline void _translateCextQ0_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.lw -> lw rd′, offset(rs1′)
   di->funct3 = 2;
   di->rd = ((instr >> 2) & 0x7) + 8;
@@ -56,7 +56,7 @@ static inline void _translateCextQ0_2(RV64_Cpu* self, unsigned int instr, struct
   _doLOAD(self, di);
 }
 
-static inline void _translateCextQ0_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.ld -> ld rd′, offset(rs1′)
   di->funct3 = 3;
   di->rd = ((instr >> 2) & 0x7) + 8;
@@ -66,21 +66,21 @@ static inline void _translateCextQ0_3(RV64_Cpu* self, unsigned int instr, struct
   _doLOAD(self, di);
 }
 
-static inline void _translateCextQ0_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   (void)instr;
 
   // reserved -> illegal
   _doILL(self, di);
 }
 
-static inline void _translateCextQ0_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   (void)instr;
 
   // ???
   _doILL(self, di);
 }
 
-static inline void _translateCextQ0_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.sw -> sw rs2′, offset(rs1′)
   di->funct3 = 2;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
@@ -90,7 +90,7 @@ static inline void _translateCextQ0_6(RV64_Cpu* self, unsigned int instr, struct
   _doSTORE(self, di);
 }
 
-static inline void _translateCextQ0_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ0_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.sd -> sd rs2′, offset(rs1′)
   di->funct3 = 3;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
@@ -100,7 +100,7 @@ static inline void _translateCextQ0_7(RV64_Cpu* self, unsigned int instr, struct
   _doSTORE(self, di);
 }
 
-static inline void _translateCextQ1_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     const unsigned int imm = ((instr >> 2) & 0x1FLU) | ((instr >> 7) & (1LU << 5));
@@ -123,7 +123,7 @@ static inline void _translateCextQ1_0(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ1_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.addiw -> addiw rd, rd, imm
@@ -141,7 +141,7 @@ static inline void _translateCextQ1_1(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ1_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.li -> addi rd, x0, imm
@@ -159,7 +159,7 @@ static inline void _translateCextQ1_2(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ1_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     if(rd == 2) {
@@ -196,7 +196,7 @@ static inline void _translateCextQ1_3(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const uint32_t imm = ((instr >> 2) & 0x1FLU) | ((instr >> 7) & (1LU << 5));
   const unsigned int rd = ((instr >> 7) & 0x7) + 8;
   switch((instr >> 10) & 3) {
@@ -328,7 +328,7 @@ static inline void _translateCextQ1_4(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ1_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.j -> jal x0, offset
   const uint32_t imm = (instr >> 2) & 0x7FF;
   const uint32_t offset = SIGN_EXTEND(ASSEMBLE_11(imm, 5, 1, 2, 3, 7, 6, 10, 8, 9, 4, 11), 11, uint32_t);
@@ -339,7 +339,7 @@ static inline void _translateCextQ1_5(RV64_Cpu* self, unsigned int instr, struct
   _doJAL(self, di);
 }
 
-static inline void _translateCextQ1_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.beqz -> beq rs1', x0, offset
   const uint32_t imm = ((instr << 3) & (1LU << 5)) | ((instr >> 2) & (3LU << 1)) | ((instr << 1) & (3LU << 6)) | ((instr >> 7) & (3LU << 3)) | ((instr >> 4) & (1LU << 8));
   const uint32_t offset = SIGN_EXTEND(imm, 8, uint32_t);
@@ -352,7 +352,7 @@ static inline void _translateCextQ1_6(RV64_Cpu* self, unsigned int instr, struct
   _doBRANCH(self, di);
 }
 
-static inline void _translateCextQ1_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ1_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.bnez -> bne rs1', x0, offset
   const uint32_t imm = ((instr << 3) & (1LU << 5)) | ((instr >> 2) & (3LU << 1)) | ((instr << 1) & (3LU << 6)) | ((instr >> 7) & (3LU << 3)) | ((instr >> 4) & (1LU << 8));
   const uint32_t offset = SIGN_EXTEND(imm, 8, uint32_t);
@@ -365,7 +365,7 @@ static inline void _translateCextQ1_7(RV64_Cpu* self, unsigned int instr, struct
   _doBRANCH(self, di);
 }
 
-static inline void _translateCextQ2_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const uint32_t shamt = ((instr >> 2) & 0x1FLU) | ((instr >> 7) & (1LU << 5));
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(shamt && rd) {
@@ -382,14 +382,14 @@ static inline void _translateCextQ2_0(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ2_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_1(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   (void)instr;
 
   // ???
   _doILL(self, di);
 }
 
-static inline void _translateCextQ2_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.lwsp -> lw rd, offset(x2)
@@ -405,7 +405,7 @@ static inline void _translateCextQ2_2(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ2_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.ldsp -> ld rd, imm(x2)
@@ -421,7 +421,7 @@ static inline void _translateCextQ2_3(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ2_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_4(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const unsigned int uimm5 = (instr >> 12) & 1;
   const unsigned int rs1 = (instr >> 7) & 0x1F;
   const unsigned int rs2 = (instr >> 2) & 0x1F;
@@ -486,14 +486,14 @@ static inline void _translateCextQ2_4(RV64_Cpu* self, unsigned int instr, struct
   }
 }
 
-static inline void _translateCextQ2_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_5(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   (void)instr;
 
   // ???
   _doILL(self, di);
 }
 
-static inline void _translateCextQ2_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.swsp -> sw rs2, imm(x2)
   di->funct3 = 2;
   di->rs1 = CPU_REG_SP;
@@ -503,7 +503,7 @@ static inline void _translateCextQ2_6(RV64_Cpu* self, unsigned int instr, struct
   _doSTORE(self, di);
 }
 
-static inline void _translateCextQ2_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
+static inline void _doCextQ2_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   // c.sdsp -> sd rs2, imm(x2)
   di->funct3 = 3;
   di->rs1 = CPU_REG_SP;
@@ -514,25 +514,25 @@ static inline void _translateCextQ2_7(RV64_Cpu* self, unsigned int instr, struct
 }
 
 static inline bool _execCext(RV64_Cpu* self, uint32_t instr) {
-  typedef void (*translateCextQx_y)(RV64_Cpu* self, unsigned int instr, struct _instr *di);
-  static const translateCextQx_y jumpTable[24] = {
-    _translateCextQ0_0, _translateCextQ0_1, _translateCextQ0_2, _translateCextQ0_3,
-    _translateCextQ0_4, _translateCextQ0_5, _translateCextQ0_6, _translateCextQ0_7,
+  typedef void (*doCextQx_y)(RV64_Cpu* self, unsigned int instr, struct _instr *di);
+  static const doCextQx_y jumpTable[24] = {
+    _doCextQ0_0, _doCextQ0_1, _doCextQ0_2, _doCextQ0_3,
+    _doCextQ0_4, _doCextQ0_5, _doCextQ0_6, _doCextQ0_7,
 
-    _translateCextQ1_0, _translateCextQ1_1, _translateCextQ1_2, _translateCextQ1_3,
-    _translateCextQ1_4, _translateCextQ1_5, _translateCextQ1_6, _translateCextQ1_7,
+    _doCextQ1_0, _doCextQ1_1, _doCextQ1_2, _doCextQ1_3,
+    _doCextQ1_4, _doCextQ1_5, _doCextQ1_6, _doCextQ1_7,
 
-    _translateCextQ2_0, _translateCextQ2_1, _translateCextQ2_2, _translateCextQ2_3,
-    _translateCextQ2_4, _translateCextQ2_5, _translateCextQ2_6, _translateCextQ2_7,
+    _doCextQ2_0, _doCextQ2_1, _doCextQ2_2, _doCextQ2_3,
+    _doCextQ2_4, _doCextQ2_5, _doCextQ2_6, _doCextQ2_7,
   };
 
-  const unsigned int size = instr & 3U;
-  if(size == 3)
+  const unsigned int q = instr & 3U;
+  if(q == 3)
     return false;
 
   const unsigned int funct3 = (instr >> 13) & 7;
 
-  const unsigned int idx = size << 3 | funct3;
+  const unsigned int idx = (q << 3) | funct3;
 
   struct _instr di;
   di.size = 2;
