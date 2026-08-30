@@ -75,10 +75,6 @@ typedef struct {
 
   Bus *bus;
 
-#ifndef CONFIG_DOS
-  uint32_t cycle;
-#endif
-
   bool wfi;
 
   struct {

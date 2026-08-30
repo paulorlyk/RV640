@@ -13,10 +13,6 @@
 #include <string.h>
 #include <assert.h>
 
-#ifndef CONFIG_DOS
-// static bool _trace = false;
-#endif
-
 static inline void _trap(RV64_Cpu *self, RV64_MCAUSE cause, bool interrupt) {
   self->trap = true;
 
@@ -223,66 +219,15 @@ static inline void _readMem(RV64_Cpu *self, cpu_addr_t addr, void* buf, size_t s
 
   if(!bus_read(self->bus, addr, buf, size))
     _trap(self, MCAUSE_LD_AF, false);
-
-#ifndef CONFIG_DOS
-  // if(_trace) {
-  //   char *s = malloc(size * 4 + 2 + 1);
-  //   char *p = s;
-  //   for(size_t i = 0; i < size; ++i)
-  //     p += sprintf(p, "%02x ", ((const uint8_t *)buf)[i]);
-  //   p += sprintf(p, "| ");
-  //   for(size_t i = 0; i < size; ++i)
-  //     *p++ = isprint(((const char *)buf)[i]) ? ((const char *)buf)[i] : '.';
-  //   *p = '\0';
-  //   DEBUG("Mem RD: %04lu [%s] <- %" PRI_CPU_PTR, size, s, addr);
-  //   free(s);
-  // }
-#endif
-
 }
 
 static inline void _writeMem(RV64_Cpu *self, cpu_addr_t addr, const void* buf, size_t size) {
   if(self->trap)
     return;
 
-#ifndef CONFIG_DOS
-  // if(_trace || addr == 0x807917b8) {
-  //   char *s = malloc(size * 4 + 2 + 1);
-  //   char *p = s;
-  //   for(size_t i = 0; i < size; ++i)
-  //     p += sprintf(p, "%02x ", ((const uint8_t *)buf)[i]);
-  //   p += sprintf(p, "| ");
-  //   for(size_t i = 0; i < size; ++i)
-  //     *p++ = isprint(((const char *)buf)[i]) ? ((const char *)buf)[i] : '.';
-  //   *p = '\0';
-  //   DEBUG("Mem WR: %04lu [%s] -> %" PRI_CPU_PTR, size, s, addr);
-  //   free(s);
-  // }
-#endif
-
   if(!bus_write(self->bus, addr, buf, size))
     _trap(self, MCAUSE_ST_AF, false);
 }
-
-// static inline uint32_t _readMem32(RV64_Cpu *self, cpu_addr_t addr) {
-//   uint32_t res = 0;
-//   _readMem(self, addr, &res, sizeof(res));
-//   return res;
-// }
-
-// static inline void _writeMem32(RV64_Cpu *self, cpu_addr_t addr, uint32_t data) {
-//   _writeMem(self, addr, &data, sizeof(data));
-// }
-
-// static inline uint64_t _readMem64(RV64_Cpu *self, cpu_addr_t addr) {
-//   uint64_t res = 0;
-//   _readMem(self, addr, &res, sizeof(res));
-//   return res;
-// }
-
-// static inline void _writeMem64(RV64_Cpu *self, cpu_addr_t addr, uint64_t data) {
-//   _writeMem(self, addr, &data, sizeof(data));
-// }
 
 static inline uint32_t _fetch(RV64_Cpu *self) {
   const cpu_word_t pc = _readPC(self);
@@ -368,17 +313,6 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
       switch(di->iimm) {
         case 0: {
           // ECALL
-#ifndef CONFIG_DOS
-          // cpu_word_t syscall = self->regs.abi.a7;
-          // if(syscall == 222) {
-          //   // mmap
-          //   cpu_word_t addr = self->regs.abi.a0;
-          //   cpu_word_t len = self->regs.abi.a1;
-          //   if(len > 4096)
-          //     DEBUG("mmap: %" PRI_CPU_SIZE, len);
-          //   // _trace = true;
-          // }
-#endif
           RV64_MCAUSE cause;
           switch(self->mode) {
             default:
@@ -1278,10 +1212,6 @@ void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {
 
   bus_reservationCheckInvalidate(self->bus, 0, 0);
 
-#ifndef CONFIG_DOS
-  self->cycle = 0;
-#endif
-
   self->wfi = false;
 
   self->mstatus = MSTATUS_WR_VAL(0U);
@@ -1296,37 +1226,6 @@ void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {
 }
 
 void rv64_run(RV64_Cpu *self) {
-#ifndef CONFIG_DOS
-  ++self->cycle;
-
-  // _trace = true;
-  // if(self->cycle == 428904) {
-  //   bus_dump(self->bus, self->regs.abi.a0, 1024);
-  //   // bus_dump(self->bus, self->regs.abi.a1, 1024);
-  // }
-  // if(self->PC == 0x801c017a) {
-  //   bus_dump(self->bus, 0x80307c80, 8);
-  //   // bus_dump(self->bus, self->regs.abi.a1, 128);
-  // }
-  // if(self->cycle >= 428904)
-  //   _trace = true;
-  // if(self->PC == 0x801c025e)
-  // if(_trace || self->cycle >= 2201990 || self->PC == 0x80095ed8)
-  //   _trace = true;
-  // if(_trace || self->PC == 0x80227904)
-  // if(_trace || self->cycle >= 18593005) {
-  //   // bus_dump(self->bus, self->mepc - 4, 1024);
-  //   _trace = true;
-  // }
-
-  assert(self->regs.Rx[CPU_REG_X0] == 0);
-#endif
-
-  // if(self->cycle >= 1982466) {
-  //   // bus_dump(self->bus, self->regs.abi.a0, 128);
-  //   DEBUG("PC: %" PRI_CPU_PTR " A6: %" PRI_CPU_PTR " A5: %" PRI_CPU_PTR " A4: %" PRI_CPU_PTR " A2: %" PRI_CPU_PTR, self->PC, self->regs.abi.a6, self->regs.abi.a5, self->regs.abi.a4, self->regs.abi.a2);
-  // }
-
   if(self->trap) {
     _doTrap(self);
   } else if(self->irq) {
@@ -1338,11 +1237,6 @@ void rv64_run(RV64_Cpu *self) {
   const uint32_t instr = _fetch(self);
   if(self->trap)
     return;
-
-#ifndef CONFIG_DOS
-  // if(_trace)
-  //   DEBUG("RV64: %" PRI_CPU_PTR ": 0x%08" PRIx32, _readPC(self), instr);
-#endif
 
   struct _instr di;
   _decode(instr, &di);
