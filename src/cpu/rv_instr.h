@@ -14,6 +14,24 @@
 
 #include <assert.h>
 
+struct _instr {
+  unsigned int size;
+  unsigned int funct3;
+  unsigned int funct5;
+  unsigned int funct7;
+  unsigned int funct12;
+  // bool aq;
+  // bool rl;
+  unsigned int rd;
+  unsigned int rs1;
+  unsigned int rs2;
+  uint32_t jimm;
+  uint32_t iimm;
+  uint32_t bimm;
+  uint32_t uimm;
+  uint32_t simm;
+};
+
 static inline void _doJAL(RV64_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->jimm, 20, cpu_word_t);
   const cpu_word_t pc = _readPC(self);

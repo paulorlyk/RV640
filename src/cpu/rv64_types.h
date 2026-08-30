@@ -16,24 +16,6 @@ typedef uint64_t cpu_size_t;
 #define CPU_SIGN_BIT ((cpu_word_t)1 << ((sizeof(cpu_word_t) * 8) - 1))
 #define CPU_UINT_MAX (~(cpu_word_t)0)
 
-struct _instr {
-  unsigned int size;
-  unsigned int funct3;
-  unsigned int funct5;
-  unsigned int funct7;
-  unsigned int funct12;
-  // bool aq;
-  // bool rl;
-  unsigned int rd;
-  unsigned int rs1;
-  unsigned int rs2;
-  uint32_t jimm;
-  uint32_t iimm;
-  uint32_t bimm;
-  uint32_t uimm;
-  uint32_t simm;
-};
-
 #define PRI_CPU_PTR PRIx64
 #define PRI_CPU_SIZE PRIu64
 #define PRI_CPU_XWORD PRIx64
