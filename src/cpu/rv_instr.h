@@ -19,14 +19,13 @@ struct _instr {
   unsigned int funct3;
   unsigned int funct5;
   unsigned int funct7;
-  unsigned int funct12;
   // bool aq;
   // bool rl;
   unsigned int rd;
   unsigned int rs1;
   unsigned int rs2;
   uint32_t jimm;
-  uint32_t iimm;
+  uint32_t iimm;  // funct12
   uint32_t bimm;
   uint32_t uimm;
   uint32_t simm;
@@ -57,6 +56,13 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
 
           self->mtval = 0;
           _trap(self, cause, false);
+          break;
+        }
+
+        case 1: {
+          // EBREAK
+          self->mtval = 0;
+          _trap(self, MCAUSE_BREAKPOINT, false);
           break;
         }
 
@@ -149,7 +155,7 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
 static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
     case 1: {
-      if(!di->funct12 && !di->rs1 && !di->rd) {
+      if(!di->iimm && !di->rs1 && !di->rd) {
         // FENCE.I
         _flushIcache(self);
       } else {
@@ -161,7 +167,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
 
     case 2: {
       // CBO
-      switch(di->funct12) {
+      switch(di->iimm) {
         default: {
           _trap(self, MCAUSE_INST_ILL, false);
           assert(false);
@@ -915,7 +921,6 @@ static inline void _execInstr(RV64_Cpu* self, uint32_t instr) {
   di.funct3 = (instr >> 12) & 0x7;
   di.funct5 = (instr >> 27) & 0x1F;
   di.funct7 = (instr >> 25) & 0x7F;
-  di.funct12 = (instr >> 20) & 0xFFF;
 
   // di.aq = !!(instr & (1LU << 26));
   // di.rl = !!(instr & (1LU << 25));

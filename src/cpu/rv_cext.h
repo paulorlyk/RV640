@@ -12,7 +12,6 @@
 #include "../utils.h"
 
 #include <stdbool.h>
-#include <assert.h>
 
 static inline void _cextNop(RV64_Cpu* self, struct _instr *di) {
   di->funct3 = 0;
@@ -479,8 +478,13 @@ static inline void _doCextQ2_4(RV64_Cpu* self, unsigned int instr, struct _instr
 
         _doJALR(self, di);
       } else {
-        // c.break
-        assert(false);
+        // c.ebreak
+        di->iimm = 1;
+        di->funct3 = 0;
+        di->rd = 0;
+        di->rs1 = 0;
+
+        _doSYSTEM(self, di);
       }
     }
   }
