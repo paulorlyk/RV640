@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#include "../utils.h"
+
 typedef uint64_t cpu_word_t;
 typedef int64_t  cpu_sword_t;
 typedef uint64_t cpu_addr_t;
@@ -168,5 +170,11 @@ typedef enum {
 #define MSTATUS_TSR_MASK  (1ULL << 22)                  // Trap SRET
 
 #define MSTATUS_WR_VAL(val) (((val) & ~(MSTATUS_WPRI_MASK | MSTATUS_UBE_MASK | MSTATUS_SBE_MASK | MSTATUS_MBE_MASK | MSTATUS_VS_MASK | MSTATUS_FS_MASK | MSTATUS_XS_MASK | MSTATUS_SD_MASK | MSTATUS_UXL_MASK | MSTATUS_SXL_MASK)) | MSTATUS_UXL_64 | MSTATUS_SXL_64)
+
+DEFINE_MAX_FUNC(cpu_addr_t);
+DEFINE_MIN_FUNC(cpu_addr_t);
+
+DEFINE_MAX_FUNC(cpu_size_t);
+DEFINE_MIN_FUNC(cpu_size_t);
 
 #endif //RV64_TYPES_H_3A55870B9B434441AC8E30E67683E50E

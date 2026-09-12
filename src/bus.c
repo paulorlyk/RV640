@@ -104,9 +104,7 @@ bool bus_dump(Bus *self, cpu_addr_t addr, size_t size) {
   for(size_t printed = 0; printed < size;) {
     const size_t lineBytes = 16;
 
-    size_t lineSize = lineBytes;
-    if(size - printed < lineSize)
-      lineSize = size - printed;
+    const size_t lineSize = min_size_t(lineBytes, size - printed);
 
     char buf[256] = {};
     char *ptr = buf;

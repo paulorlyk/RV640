@@ -827,7 +827,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         case 1: {
           // DIVUW
           if(rs2)
-              _writeReg(self, di->rd, SIGN_EXTEND(rs1 / rs2, 31, cpu_word_t));
+            _writeReg(self, di->rd, SIGN_EXTEND(rs1 / rs2, 31, cpu_word_t));
           else
             _writeReg(self, di->rd, CPU_UINT_MAX);
           break;

@@ -239,9 +239,7 @@ void mem_read(Memory *self, cpu_addr_t addr, void* buf, size_t size) {
 
     const size_t pageOffest = (size_t)localAddr & MEM_PAGE_OFFSET_MASK;
 
-    size_t chunkSize = MEM_PAGE_SIZE - pageOffest;
-    if(chunkSize > (size - done))
-      chunkSize = size - done;
+    const size_t chunkSize = min_size_t(MEM_PAGE_SIZE - pageOffest, size - done);
 
     _fmemcpy((char *)buf + done, page->data + pageOffest, chunkSize);
 
@@ -265,9 +263,7 @@ void mem_write(Memory *self, cpu_addr_t addr, const void* buf, size_t size) {
 
     const size_t pageOffest = (size_t)localAddr & MEM_PAGE_OFFSET_MASK;
 
-    size_t chunkSize = MEM_PAGE_SIZE - pageOffest;
-    if(chunkSize > (size - done))
-      chunkSize = size - done;
+    const size_t chunkSize = min_size_t(MEM_PAGE_SIZE - pageOffest, size - done);
 
     _fmemcpy(page->data + pageOffest, (const char *)buf + done, chunkSize);
 
@@ -295,9 +291,7 @@ int mem_cmp(Memory *self, cpu_addr_t addr, const void *buf, size_t size) {
 
     const size_t pageOffest = (size_t)localAddr & MEM_PAGE_OFFSET_MASK;
 
-    size_t chunkSize = MEM_PAGE_SIZE - pageOffest;
-    if(chunkSize > (size - done))
-      chunkSize = size - done;
+    size_t chunkSize = min_size_t(MEM_PAGE_SIZE - pageOffest, size - done);
 
     res = _fmemcmp(page->data + pageOffest, (const char *)buf + done, chunkSize);
     if(res)
@@ -314,4 +308,25 @@ int mem_cmp(Memory *self, cpu_addr_t addr, const void *buf, size_t size) {
 
   return memcmp(self->data + addr, buf, size);
 #endif
+}
+
+bool mem_dumpImage(Memory *self, const char *imgFile) {
+  FILE *f = fopen(imgFile, "wb");
+  if(!f)
+    return false;
+
+  for(cpu_size_t s = 0; s < self->dev.size;) {
+    char buf[4096];
+    const cpu_size_t chunkSize = min_cpu_size_t(sizeof(buf), self->dev.size - s);
+
+    mem_read(self, s, buf, chunkSize);
+
+    fwrite(buf, 1, chunkSize, f);
+
+    s += chunkSize;
+  }
+
+  fclose(f);
+
+  return true;
 }

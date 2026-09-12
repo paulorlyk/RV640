@@ -5,6 +5,8 @@
 #ifndef UTILS_H_EF6EF93B375142EE89A91BE89F1268C0
 #define UTILS_H_EF6EF93B375142EE89A91BE89F1268C0
 
+#include <stddef.h>
+
 #define REPEAT_1(f)                 f(0)
 #define REPEAT_2(f)   REPEAT_1(f)   f(1)
 #define REPEAT_3(f)   REPEAT_2(f)   f(2)
@@ -81,5 +83,14 @@
     | ((((data) >> 18U) & 1U) << (unsigned int)(r18)) \
     | ((((data) >> 19U) & 1U) << (unsigned int)(r19)) \
   )
+
+#define DEFINE_MAX_FUNC(type) \
+  static inline type max_##type(type a, type b) { return a > b ? a : b; }
+
+#define DEFINE_MIN_FUNC(type) \
+  static inline type min_##type(type a, type b) { return a < b ? a : b; }
+
+DEFINE_MAX_FUNC(size_t);
+DEFINE_MIN_FUNC(size_t);
 
 #endif //UTILS_H_EF6EF93B375142EE89A91BE89F1268C0
