@@ -14,12 +14,18 @@
 #include <stdbool.h>
 
 static inline void _cextNop(RV64_Cpu* self, struct _instr *di) {
-  di->funct3 = 0;
-  di->rd = 0;
-  di->rs1 = 0;
-  di->iimm = 0;
+  // nop -> addi x0, x0, 0
 
-  _doOPIMM(self, di);
+  // di->funct3 = 0;
+  // di->rd = 0;
+  // di->rs1 = 0;
+  // di->iimm = 0;
+  //
+  // _doOPIMM(self, di);
+
+  // No side effects, so no reason to execute a real instruction
+  (void)self;
+  (void)di;
 }
 
 static inline void _doCextQ0_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
