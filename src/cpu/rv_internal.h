@@ -8,7 +8,7 @@
 #include "rv64.h"
 
 static inline void _flushIcache(RV64_Cpu *self) {
-  self->icache.base = CPU_UINT_MAX;
+  self->icache.base = (cpu_addr_t)CPU_UINT_MAX;
 }
 
 static inline void _trap(RV64_Cpu *self, RV64_MCAUSE cause, bool interrupt) {

@@ -111,7 +111,7 @@ static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t 
     return 0;
   }
 
-  INFO("Loading Linux image to 0x%" PRI_CPU_PTR, text_offset + memBase);
+  INFO("Loading Linux image to 0x%" PRI_CPU_PTR, (cpu_addr_t)(text_offset + memBase));
 
   cpu_addr_t textPtr = text_offset;
 
@@ -125,10 +125,10 @@ static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t 
     textPtr += read;
 
     if((n % 256) == 0)
-      INFO("Linux image: %" PRI_CPU_SIZE " bytes", textPtr - text_offset);
+      INFO("Linux image: %" PRI_CPU_SIZE " bytes", textPtr - (cpu_addr_t)text_offset);
   }
 
-  INFO("Loaded Linux image, size = %" PRI_CPU_SIZE, textPtr - text_offset);
+  INFO("Loaded Linux image, size = %" PRI_CPU_SIZE, textPtr - (cpu_addr_t)text_offset);
 
   free(buf);
 

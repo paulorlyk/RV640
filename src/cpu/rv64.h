@@ -58,7 +58,7 @@ typedef struct {
     } abi;
     cpu_word_t Rx[32];
   } regs;
-  cpu_word_t PC;
+  cpu_addr_t PC;
 
   cpu_word_t mip; // Machine Interrupt-Pending
   cpu_word_t mie; // Machine Interrupt-Enable

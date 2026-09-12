@@ -12,14 +12,26 @@
 
 typedef uint64_t cpu_word_t;
 typedef int64_t  cpu_sword_t;
+
+#ifdef CONFIG_RV64_32BIT_ADDR
+typedef uint32_t cpu_addr_t;
+typedef uint32_t cpu_size_t;
+#else
 typedef uint64_t cpu_addr_t;
 typedef uint64_t cpu_size_t;
+#endif
 
 #define CPU_SIGN_BIT ((cpu_word_t)1 << ((sizeof(cpu_word_t) * 8) - 1))
 #define CPU_UINT_MAX (~(cpu_word_t)0)
 
+#ifdef CONFIG_RV64_32BIT_ADDR
+#define PRI_CPU_PTR PRIx32
+#define PRI_CPU_SIZE PRIu32
+#else
 #define PRI_CPU_PTR PRIx64
 #define PRI_CPU_SIZE PRIu64
+#endif
+
 #define PRI_CPU_XWORD PRIx64
 
 typedef enum {

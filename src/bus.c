@@ -109,7 +109,7 @@ bool bus_dump(Bus *self, cpu_addr_t addr, size_t size) {
     char buf[256] = {};
     char *ptr = buf;
 
-    ptr += sprintf(ptr, "%08" PRI_CPU_PTR ": ", addr + printed);
+    ptr += sprintf(ptr, "%08" PRI_CPU_PTR ": ", addr + (cpu_addr_t)printed);
 
     for(size_t i = 0; i < lineSize; ++i)
       ptr += sprintf(ptr, "%02x ", memPtr[i]);

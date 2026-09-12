@@ -48,6 +48,7 @@ target_link_options(${EXECUTABLE_8086} PRIVATE
 target_compile_definitions(${EXECUTABLE_8086} PRIVATE
 #    NDEBUG
     CONFIG_DOS=1
+    CONFIG_RV64_32BIT_ADDR=1
 )
 
 add_custom_command(TARGET ${EXECUTABLE_8086} POST_BUILD
