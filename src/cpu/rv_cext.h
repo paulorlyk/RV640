@@ -25,7 +25,7 @@ static inline void _cextNop(RV64_Cpu* self, struct _instr *di) {
 static inline void _doCextQ0_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
   const uint32_t imm = ((instr >> 2) & (1LU << 3)) | ((instr >> 4) & (1LU << 2)) | ((instr >> 1) & (1LU << 2)) | ((instr >> 1) & (0xFLU << 6)) | ((instr >> 7) & (0x3LU << 4));
   if(imm) {
-    // c.addi4spn -> addi rd′, x2, imm[9:2]
+    // c.addi4spn -> addi rd', x2, imm[9:2]
     di->funct3 = 0;
     di->rd = ((instr >> 2) & 0x7) + 8;
     di->rs1 = CPU_REG_SP;
@@ -46,7 +46,7 @@ static inline void _doCextQ0_1(RV64_Cpu* self, unsigned int instr, struct _instr
 }
 
 static inline void _doCextQ0_2(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
-  // c.lw -> lw rd′, offset(rs1′)
+  // c.lw -> lw rd', offset(rs1')
   di->funct3 = 2;
   di->rd = ((instr >> 2) & 0x7) + 8;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
@@ -56,7 +56,7 @@ static inline void _doCextQ0_2(RV64_Cpu* self, unsigned int instr, struct _instr
 }
 
 static inline void _doCextQ0_3(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
-  // c.ld -> ld rd′, offset(rs1′)
+  // c.ld -> ld rd', offset(rs1')
   di->funct3 = 3;
   di->rd = ((instr >> 2) & 0x7) + 8;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
@@ -80,7 +80,7 @@ static inline void _doCextQ0_5(RV64_Cpu* self, unsigned int instr, struct _instr
 }
 
 static inline void _doCextQ0_6(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
-  // c.sw -> sw rs2′, offset(rs1′)
+  // c.sw -> sw rs2', offset(rs1')
   di->funct3 = 2;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
   di->rs2 = ((instr >> 2) & 0x7) + 8;
@@ -90,7 +90,7 @@ static inline void _doCextQ0_6(RV64_Cpu* self, unsigned int instr, struct _instr
 }
 
 static inline void _doCextQ0_7(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
-  // c.sd -> sd rs2′, offset(rs1′)
+  // c.sd -> sd rs2', offset(rs1')
   di->funct3 = 3;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
   di->rs2 = ((instr >> 2) & 0x7) + 8;
@@ -201,7 +201,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
   switch((instr >> 10) & 3) {
     default:
     case 0: {
-      // c.srli -> srli rd′, rd′, imm
+      // c.srli -> srli rd', rd', imm
       di->funct3 = 5;
       di->rd = rd;
       di->rs1 = rd;
@@ -212,7 +212,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
     }
 
     case 1: {
-      // c.srai -> srai rd′, rd′, shamt
+      // c.srai -> srai rd', rd', shamt
       di->funct3 = 5;
       di->rd = rd;
       di->rs1 = rd;
@@ -223,7 +223,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
     }
 
     case 2: {
-      // c.andi -> andi rd′, rd′, imm
+      // c.andi -> andi rd', rd', imm
       di->funct3 = 7;
       di->rd = rd;
       di->rs1 = rd;
@@ -239,7 +239,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
         switch((instr >> 5) & 3) {
           default:
           case 0: {
-            // c.subw -> subw rd′, rd′, rs2′
+            // c.subw -> subw rd', rd', rs2'
             di->funct3 = 0;
             di->funct7 = 32;
             di->rd = rd;
@@ -251,7 +251,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
           }
 
           case 1: {
-            // c.addw -> addw rd′, rd′, rs2′
+            // c.addw -> addw rd', rd', rs2'
             di->funct3 = 0;
             di->funct7 = 0;
             di->rd = rd;
@@ -274,7 +274,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
         switch((instr >> 5) & 3) {
           default:
           case 0: {
-            // c.sub -> sub rd′, rd′, rs2′
+            // c.sub -> sub rd', rd', rs2'
             di->funct3 = 0;
             di->funct7 = 32;
             di->rd = rd;
@@ -286,7 +286,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
           }
 
           case 1: {
-            // c.xor -> xor rd′, rd′, rs2′
+            // c.xor -> xor rd', rd', rs2'
             di->funct3 = 4;
             di->funct7 = 0;
             di->rd = rd;
@@ -298,7 +298,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
           }
 
           case 2: {
-            // c.or -> or rd′, rd′, rs2′
+            // c.or -> or rd', rd', rs2'
             di->funct3 = 6;
             di->funct7 = 0;
             di->rd = rd;
@@ -310,7 +310,7 @@ static inline void _doCextQ1_4(RV64_Cpu* self, unsigned int instr, struct _instr
           }
 
           case 3: {
-            // c.and -> and rd′, rd′, rs2′
+            // c.and -> and rd', rd', rs2'
             di->funct3 = 7;
             di->funct7 = 0;
             di->rd = rd;
