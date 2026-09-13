@@ -5,22 +5,34 @@
 # (a bare-metal riscv64-unknown-elf- toolchain works too; just adjust
 # CROSS below)
 #
+# All build outputs (object files, the linked ELF, and the flat
+# binary) are placed under BUILD_DIR (default: build/), which is
+# created automatically if it doesn't exist. Source files stay in the
+# repo root.
+#
 # Source layout:
 #   common.S         - reusable boot/UART/reporter harness, suite-agnostic.
 #                       Provides _start and expects a "run_tests" symbol
 #                       from whichever test-suite object is linked in.
-#   rvc_tests.S       - RVC suite orchestrator; defines run_tests, calls
-#                       tests_quadrant0/1/2.
+#   main_tests.S      - top-level dispatcher; defines run_tests, calls
+#                       each suite's own entry point in turn.
+#   rvc_tests.S       - RVC suite orchestrator; defines run_rvc_tests,
+#                       calls tests_quadrant0/1/2.
 #   rvc_quadrant0.S   - C.ADDI4SPN, C.LW, C.SW, C.LD, C.SD
 #   rvc_quadrant1.S   - C.NOP, C.ADDI, C.ADDIW, C.LI, C.ADDI16SP, C.LUI,
 #                       C.SRLI, C.SRAI, C.ANDI, C.SUB, C.XOR, C.OR,
 #                       C.AND, C.SUBW, C.ADDW, C.J, C.BEQZ, C.BNEZ
 #   rvc_quadrant2.S   - C.SLLI, C.LWSP, C.LDSP, C.JR, C.MV, C.EBREAK,
 #                       C.JALR, C.ADD, C.SWSP, C.SDSP
+#   base_tests.S      - RV64I base-ISA suite orchestrator; defines
+#                       run_base_tests, calls tests_base_loads (and
+#                       future base-ISA category files the same way).
+#   base_loads.S      - LB, LH, LW, LD, LBU, LHU, LWU
 #
 # Future instruction-set suites (e.g. an "M" extension test) can be
-# added as their own SUITE_SRCS files that also define run_tests,
-# reusing common.S unchanged -- see README.md.
+# added as their own file(s) defining run_yyy_tests, with one new line
+# in main_tests.S to call it and its object file(s) added to
+# SUITE_SRCS below -- see README.md.
 
 CROSS   ?= riscv64-linux-gnu-
 AS      = $(CROSS)as
@@ -31,23 +43,32 @@ OBJDUMP = $(CROSS)objdump
 ARCH    = rv64imac_zicsr_zifencei
 ABI     = lp64
 
+BUILD_DIR   = build
+
 COMMON_SRC  = common.S
-SUITE_SRCS  = rvc_tests.S rvc_quadrant0.S rvc_quadrant1.S rvc_quadrant2.S
-SUITE_OBJS  = $(SUITE_SRCS:.S=.o)
-OUT         = rvc_test
+SUITE_SRCS  = main_tests.S rvc_tests.S rvc_quadrant0.S rvc_quadrant1.S rvc_quadrant2.S \
+              base_tests.S base_loads.S
+SUITE_OBJS  = $(addprefix $(BUILD_DIR)/,$(SUITE_SRCS:.S=.o))
+COMMON_OBJ  = $(BUILD_DIR)/common.o
+OUT         = $(BUILD_DIR)/rvc_test
 
 all: $(OUT).bin
 
-common.o: $(COMMON_SRC)
+# Order-only prerequisite: create the build directory without treating
+# its mtime as a reason to rebuild everything else.
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(COMMON_OBJ): $(COMMON_SRC) | $(BUILD_DIR)
 	$(AS) -march=$(ARCH) -mabi=$(ABI) -o $@ $<
 
-%.o: %.S
+$(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	$(AS) -march=$(ARCH) -mabi=$(ABI) -o $@ $<
 
 # common.o must come first on the link line so _start (in common.S)
 # lands at the very base of .text, i.e. at the 0x80000000 load address.
-$(OUT).elf: common.o $(SUITE_OBJS)
-	$(LD) -Ttext=0x80000000 --no-dynamic-linker -nostdlib -o $@ common.o $(SUITE_OBJS)
+$(OUT).elf: $(COMMON_OBJ) $(SUITE_OBJS)
+	$(LD) -Ttext=0x80000000 --no-dynamic-linker -nostdlib -o $@ $(COMMON_OBJ) $(SUITE_OBJS)
 
 $(OUT).bin: $(OUT).elf
 	$(OBJCOPY) -O binary $< $@
@@ -62,6 +83,6 @@ run: $(OUT).elf
 	qemu-system-riscv64 -M virt -bios none -kernel $(OUT).elf -nographic -serial mon:stdio
 
 clean:
-	rm -f common.o $(SUITE_OBJS) $(OUT).o $(OUT).elf $(OUT).bin
+	rm -rf $(BUILD_DIR)
 
 .PHONY: all run disasm clean

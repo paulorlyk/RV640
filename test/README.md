@@ -1,38 +1,38 @@
-# RV64C instruction-set exerciser
+# RV64 instruction-set exerciser
 
-A bare-metal, M-mode RISC-V test firmware that exercises the RV64C
-("C", compressed) extension and reports PASS/FAIL for each case over
-an ns16550a serial port. Built from five files:
+A bare-metal, M-mode RISC-V test firmware that exercises RV64
+instructions and reports PASS/FAIL for each case over an ns16550a
+serial port. Two instruction-set suites are included so far — the
+RV64C ("C", compressed) extension, and the RV64I base-ISA load
+instructions — sharing one common boot/UART/reporting harness and one
+running pass/fail total.
 
-- **`common.S`** — the reusable harness. Knows nothing about RVC or
-  any other instruction set. Provides: the reset vector / M-mode entry
-  at `0x80000000`, `gp`/`sp`/`mtvec` setup, a minimal trap handler
+## Architecture
+
+- **`common.S`** — the reusable harness. Knows nothing about what's
+  being tested. Provides: the reset vector / M-mode entry at
+  `0x80000000`, `gp`/`sp`/`mtvec` setup, a minimal trap handler
   (expects only `EBREAK`, reports and hangs on anything else), the
   ns16550a UART driver (9600 8N1 init, `putc`/`puts`, hex/decimal
   printing), the `check` pass/fail comparator (prints a verdict and
   tracks running `pass_count`/`fail_count` totals), and the final
-  summary/halt.
-- **`rvc_tests.S`** — the RVC suite's top-level orchestrator. Defines
-  `run_tests`, the single symbol `common.S` calls into: it prints the
-  banner and calls each quadrant's entry point in turn.
-- **`rvc_quadrant0.S`** / **`rvc_quadrant1.S`** / **`rvc_quadrant2.S`**
-  — the actual per-instruction test bodies, grouped the same way the
-  RVC spec itself groups them (bits `[1:0]` of the 16-bit instruction
-  select the quadrant). Each file exposes exactly one symbol,
-  `tests_quadrantN`, to the outside — its macros and per-instruction
-  `test_c_*` subroutines stay local to that file. All three only
-  depend on `check`/`uart_puts` from `common.S` (plus `word_buf`,
-  defined in `rvc_quadrant0.S` and used by one test in
-  `rvc_quadrant1.S` — the one cross-quadrant reference in the suite).
-
-This split exists so other instruction-set suites can be added later
-without touching the boot/UART/reporting code, and so each quadrant
-(or eventually, each instruction) is easy to work on in isolation —
-see "Adding another test suite" below.
+  summary/halt. It calls a single symbol, `run_tests`, and otherwise
+  doesn't know or care how many suites exist or what they test.
+- **`main_tests.S`** — the top-level dispatcher. Defines `run_tests`
+  and just calls each suite's own entry point in turn
+  (`run_rvc_tests`, `run_base_tests`). This is the file you touch to
+  add a new suite (see "Adding another test suite" below).
+- **`rvc_tests.S`** + **`rvc_quadrant0/1/2.S`** — the RV64C suite. See
+  "The RVC suite" below.
+- **`base_tests.S`** + **`base_loads.S`** — the RV64I base-ISA suite.
+  See "The base-ISA suite" below.
 
 It has been built and run for real (not just hand-checked) with:
 - `binutils-riscv64-linux-gnu` (assembler/linker/objdump) to confirm
-  every intended `c.*` mnemonic assembles to its real 2-byte encoding.
+  every RVC instruction assembles to its real 2-byte encoding, and
+  every base-ISA instruction stays a genuine 4-byte encoding (not
+  silently substituted for a compressed form — see "The base-ISA
+  suite" below for why that's a real risk worth guarding against).
 - `qemu-system-riscv64 -M virt -bios none` to actually execute it — the
   QEMU `virt` machine happens to match this program's assumed memory
   map almost exactly (RAM at `0x80000000`, ns16550a at `0x10000000`,
@@ -40,16 +40,26 @@ It has been built and run for real (not just hand-checked) with:
   convenient way to sanity-check the binary before trying it on real
   hardware or another simulator.
 
-## What's covered
+Current total: **949 result lines**, all passing.
 
-All 33 RV64C integer instructions, currently **749 result lines**
-total:
+## The RVC suite
 
-| Quadrant | File | Instructions |
-|---|---|---|
-| 0 (loads/stores, x8-x15 only) | `rvc_quadrant0.S` | `C.ADDI4SPN`, `C.LW`, `C.LD`, `C.SW`, `C.SD` |
-| 1 (ALU / control flow) | `rvc_quadrant1.S` | `C.NOP`, `C.ADDI`, `C.ADDIW`, `C.LI`, `C.ADDI16SP`, `C.LUI`, `C.SRLI`, `C.SRAI`, `C.ANDI`, `C.SUB`, `C.XOR`, `C.OR`, `C.AND`, `C.SUBW`, `C.ADDW`, `C.J`, `C.BEQZ`, `C.BNEZ` |
-| 2 (SP-relative / jumps) | `rvc_quadrant2.S` | `C.SLLI`, `C.LWSP`, `C.LDSP`, `C.JR`, `C.MV`, `C.EBREAK`, `C.JALR`, `C.ADD`, `C.SWSP`, `C.SDSP` |
+All 33 RV64C integer instructions, split across four files:
+
+| File | Instructions |
+|---|---|
+| `rvc_tests.S` | orchestrator; defines `run_rvc_tests`, prints the banner, calls each quadrant in turn |
+| `rvc_quadrant0.S` | `C.ADDI4SPN`, `C.LW`, `C.LD`, `C.SW`, `C.SD` |
+| `rvc_quadrant1.S` | `C.NOP`, `C.ADDI`, `C.ADDIW`, `C.LI`, `C.ADDI16SP`, `C.LUI`, `C.SRLI`, `C.SRAI`, `C.ANDI`, `C.SUB`, `C.XOR`, `C.OR`, `C.AND`, `C.SUBW`, `C.ADDW`, `C.J`, `C.BEQZ`, `C.BNEZ` |
+| `rvc_quadrant2.S` | `C.SLLI`, `C.LWSP`, `C.LDSP`, `C.JR`, `C.MV`, `C.EBREAK`, `C.JALR`, `C.ADD`, `C.SWSP`, `C.SDSP` |
+
+The quadrant grouping matches the RVC spec's own opcode layout (bits
+`[1:0]` of the 16-bit instruction select the quadrant). Each quadrant
+file exposes exactly one symbol, `tests_quadrantN`, to the outside —
+its macros and per-instruction `test_c_*` subroutines stay local. All
+three only depend on `check`/`uart_puts` from `common.S` (plus
+`word_buf`, defined in `rvc_quadrant0.S` and used by one test in
+`rvc_quadrant1.S` — the one cross-quadrant reference in the suite).
 
 **Not covered:** `C.FLD`/`C.FSD`/`C.FLDSP`/`C.FSDSP` (require the `D`
 floating-point extension) and `C.FLW`/`C.FSW` (RV32FC-only, don't
@@ -57,15 +67,7 @@ exist in RV64C). `C.JAL` is RV32C-only — on RV64C that encoding is
 `C.ADDIW`, which *is* tested. `C.UNIMP` is an intentionally-illegal
 all-zero bit pattern, not an instruction to execute.
 
-Every instruction in all three quadrants now gets this comprehensive,
-edge-case-driven treatment.
-
-### What "comprehensive" means here
-
-For instructions with restricted register fields (`rd'`/`rs1'`/`rs2'`
-limited to `x8`-`x15`) or scrambled immediate encodings, a single test
-with one convenient register/immediate barely exercises the decoder.
-The in-depth cases instead cover:
+Every instruction gets comprehensive, edge-case-driven coverage:
 
 - **Every legal register** in each restricted field, to catch a wrong
   bit in the 3-bit register decode — including register-aliasing cases
@@ -117,6 +119,67 @@ Every `c.*` mnemonic is written explicitly (wrapped in
 exactly that compressed encoding, and will fail the build if the
 chosen registers/immediate don't fit the format.
 
+## The base-ISA suite
+
+RV64I's load instructions, in `base_loads.S`: `LB`, `LH`, `LW`, `LD`,
+`LBU`, `LHU`, `LWU`.
+
+Base-ISA instructions have a genuinely different risk profile than
+RVC ones, which shapes the coverage differently:
+
+- **No restricted register fields** — `rd` and `rs1` are each a full,
+  independent 5-bit field, so there's no 3-bit-field decode risk, but
+  a wrong bit in a 5-bit field is still possible, so each of `rd` and
+  `rs1` still gets an independent sweep across a representative sample
+  of registers (not exhaustively all 32 — the same "representative
+  sample, not full sweep" approach used for RVC's full-5-bit fields
+  like `C.ADDI`/`C.MV`/`C.JALR`).
+- **No scrambled immediate** — the 12-bit offset is one contiguous
+  field, so it only needs boundary values (`+2047`/`-2048`) and a
+  couple of representative in-between ones, not an exhaustive per-bit
+  sweep the way RVC's scattered encodings needed.
+- **Sign vs. zero extension is where the real bugs live.** This
+  project's own test-writing history includes more than one sign/zero
+  mixup (`lw` vs `lwu` used to verify a store, twice), so `LB`/`LH`/`LW`
+  and their `U`-suffixed counterparts are tested with the *exact same*
+  underlying byte patterns, so an accidental swap between sign- and
+  zero-extension is immediately visible as a mismatched expected
+  value rather than something that could quietly pass.
+- **`rd=x0` is tested once per instruction** — confirms it doesn't
+  fault and genuinely discards the loaded value.
+- **`rs1=x0` is deliberately not tested** — address `0` is unmapped in
+  this memory map (RAM starts at `0x80000000`) and there's no
+  load-access-fault handler, so it would hang rather than usefully
+  fail.
+- **Offsets are not constrained to natural alignment** for the width
+  being loaded. The RISC-V base ISA permits (without mandating
+  hardware support for) misaligned accesses, and QEMU's TCG emulation
+  handles them transparently — this is not guaranteed portable to all
+  real hardware; see "Porting" below.
+
+Every mnemonic in this suite is written with `.option norvc` active
+for the entire file — not just style, but a functional requirement:
+without it, the assembler would happily substitute a compressed
+encoding whenever the operand choice happens to allow one (e.g.
+`lw s0, 0(s1)` → `c.lw`), silently testing the wrong instruction. This
+was verified empirically (an `lw`/`ld` pair with compressible operands
+confirmed to stay 4 bytes wide under `.option norvc`) before relying
+on it throughout the suite.
+
+A real bug turned up while building this suite, worth knowing about if
+you extend it: the `*_RS1` macro family (which sweeps the base
+register while storing a fixed test value first) originally used `t0`
+as the "value to store" scratch register — but `t0` is *also* one of
+the swept `basereg` candidates. When `basereg == t0`, loading the test
+value into `t0` destroyed the address that had just been computed
+there, and the subsequent store faulted (`mcause 7`, store/AMO access
+fault) instead of writing to the intended buffer. Fixed by using `t1`
+(not in the sweep list) for the scratch value instead. This is the
+same general class of bug as several `a0`/`a1`/`a2` collisions caught
+in the RVC suite's history — a fixed helper register colliding with a
+register under test in the sweep — just showing up with a different
+register pair here.
+
 ## Building
 
 ```sh
@@ -126,25 +189,24 @@ make            # produces rvc_test.bin
 or manually:
 
 ```sh
-riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 \
-    -o common.o common.S
-riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 \
-    -o rvc_tests.o rvc_tests.S
-riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 \
-    -o rvc_quadrant0.o rvc_quadrant0.S
-riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 \
-    -o rvc_quadrant1.o rvc_quadrant1.S
-riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 \
-    -o rvc_quadrant2.o rvc_quadrant2.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o common.o common.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o main_tests.o main_tests.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_tests.o rvc_tests.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_quadrant0.o rvc_quadrant0.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_quadrant1.o rvc_quadrant1.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_quadrant2.o rvc_quadrant2.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_tests.o base_tests.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_loads.o base_loads.S
 riscv64-linux-gnu-ld -Ttext=0x80000000 --no-dynamic-linker -nostdlib \
-    -o rvc_test.elf common.o rvc_tests.o rvc_quadrant0.o rvc_quadrant1.o rvc_quadrant2.o
+    -o rvc_test.elf common.o main_tests.o rvc_tests.o rvc_quadrant0.o rvc_quadrant1.o \
+    rvc_quadrant2.o base_tests.o base_loads.o
 riscv64-linux-gnu-objcopy -O binary rvc_test.elf rvc_test.bin
 ```
 
 `common.o` must be listed first at link time — it contains `_start`,
 and needs to land at the very base of `.text` so the entry point ends
-up at the `0x80000000` load address. The other four can be in any
-order relative to each other.
+up at the `0x80000000` load address. The rest can be in any order
+relative to each other.
 
 `rvc_test.bin` is the flat binary — load it into RAM at `0x80000000`
 and reset the hart with `pc = 0x80000000`, `mode = M`.
@@ -164,15 +226,20 @@ is the same `0x80000000` load address as the flat `.bin`.
 ## Adding another test suite
 
 `common.S` doesn't know or care what it's testing — it just calls
-`run_tests` and reads `pass_count`/`fail_count` afterward. To add a new
-suite (say, the `M` extension) alongside or instead of the RVC one:
+`run_tests` (in `main_tests.S`) and reads `pass_count`/`fail_count`
+afterward. `main_tests.S` in turn just calls each suite's own entry
+point. To add a new suite (say, the `M` extension):
 
 1. Write your own top-level file (e.g. `m_tests.S`) with
-   `.global run_tests`, using `check`/`uart_puts` from `common.S` the
-   same way `rvc_tests.S` does. Split it into multiple files the same
-   way the RVC suite is split, if it's large enough to benefit.
-2. Link `common.o` + your new object(s) instead of (or alongside, if
-   `run_tests` calls into both suites) the `rvc_*.o` files.
+   `.global run_m_tests`, printing its own banner and calling into one
+   or more category files the same way `rvc_tests.S` calls into
+   `rvc_quadrant0/1/2.S` or `base_tests.S` calls into `base_loads.S`.
+   Use `check`/`uart_puts` from `common.S` the same way the existing
+   suites do. Split it into multiple files if it's large enough to
+   benefit — each category file should expose exactly one entry symbol
+   and keep its macros/subroutines local.
+2. Add one line to `main_tests.S`: `jal ra, run_m_tests`.
+3. Add your new file(s) to `SUITE_SRCS` in the `Makefile`.
 
 Everything else — boot, UART init, trap handling, pass/fail reporting,
 the final summary line — is reused as-is.
@@ -223,12 +290,25 @@ your target:
    without it, the very first data access faults with a store/AMO
    access fault, mcause 7).
 
+Additionally, for the base-ISA load suite specifically:
+
+4. **Misaligned loads are assumed not to trap.** `base_loads.S` tests
+   offsets like `+4`/`-4` against 8-byte `LD` loads, which QEMU handles
+   transparently but real hardware may legitimately fault on (the
+   RISC-V base ISA permits, but does not require, misaligned-access
+   support). There's no misaligned-access-fault handler here, so on
+   hardware that traps, these specific cases would hang rather than
+   fail cleanly.
+
 ## Files
 
 - `common.S` — reusable boot/UART/reporter harness (suite-agnostic).
-- `rvc_tests.S` — RVC suite orchestrator (defines `run_tests`).
-- `rvc_quadrant0.S` / `rvc_quadrant1.S` / `rvc_quadrant2.S` — the
+- `main_tests.S` — top-level dispatcher (defines `run_tests`).
+- `rvc_tests.S` — RVC suite orchestrator (defines `run_rvc_tests`).
+- `rvc_quadrant0.S` / `rvc_quadrant1.S` / `rvc_quadrant2.S` — the RVC
   per-instruction test bodies, one file per RVC opcode quadrant.
+- `base_tests.S` — base-ISA suite orchestrator (defines `run_base_tests`).
+- `base_loads.S` — the base-ISA load instruction test bodies.
 - `Makefile` — build/run/disasm/clean targets.
 - `rvc_test.bin` — prebuilt flat binary, ready to load at `0x80000000`.
 - `rvc_test.elf` — the linked ELF (handy for `objdump -d` / debugging
