@@ -23,6 +23,7 @@ typedef uint64_t cpu_size_t;
 
 #define CPU_SIGN_BIT ((cpu_word_t)1 << ((sizeof(cpu_word_t) * 8) - 1))
 #define CPU_UINT_MAX (~(cpu_word_t)0)
+#define CPU_ADDR_MAX (~(cpu_addr_t)0)
 
 #ifdef CONFIG_RV64_32BIT_ADDR
 #define PRI_CPU_PTR PRIx32

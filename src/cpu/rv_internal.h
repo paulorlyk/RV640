@@ -8,7 +8,7 @@
 #include "rv64.h"
 
 static inline void _flushIcache(RV64_Cpu *self) {
-  self->icache.base = (cpu_addr_t)CPU_UINT_MAX;
+  self->icache.base = CPU_ADDR_MAX;
 }
 
 static inline void _trap(RV64_Cpu *self, RV64_MCAUSE cause, bool interrupt) {
@@ -30,11 +30,11 @@ static inline void _writeReg(RV64_Cpu *self, unsigned int rd, cpu_word_t d) {
   self->regs.Rx[rd] = d;
 }
 
-static inline cpu_word_t _readPC(const RV64_Cpu *self) {
+static inline cpu_addr_t _readPC(const RV64_Cpu *self) {
   return self->PC;
 }
 
-static inline void _writePC(RV64_Cpu *self, cpu_word_t d) {
+static inline void _writePC(RV64_Cpu *self, cpu_addr_t d) {
   if(self->trap)
     return;
 

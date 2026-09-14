@@ -50,7 +50,7 @@ static inline uint32_t _fetch(RV64_Cpu *self) {
   uint32_t res = 0;
 
   cpu_addr_t offset = pc - self->icache.base;
-  if(self->icache.base == CPU_UINT_MAX || offset > (ICACHE_LINE_SIZE - sizeof(res))) {
+  if(self->icache.base == CPU_ADDR_MAX || offset > (ICACHE_LINE_SIZE - sizeof(res))) {
     if(!bus_read(self->bus, pc, self->icache.line, ICACHE_LINE_SIZE)) {
       // Very end of the memory, less than a cache line size
       if(!bus_read(self->bus, pc, &res, sizeof(res))) {

@@ -33,7 +33,7 @@ struct _instr {
 
 static inline void _doJAL(RV64_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->jimm, 20, cpu_word_t);
-  const cpu_word_t pc = _readPC(self);
+  const cpu_addr_t pc = _readPC(self);
   const cpu_word_t target = pc + imm;
 
   _writeReg(self, di->rd, pc + di->size);
@@ -550,7 +550,7 @@ static inline void _doJALR(RV64_Cpu* self, const struct _instr *di) {
     case 0: {
       // JALR
       const cpu_word_t imm = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
-      const cpu_word_t target = (_readReg(self, di->rs1) + imm) & ~(cpu_word_t)1;
+      const cpu_addr_t target = (_readReg(self, di->rs1) + imm) & ~(cpu_word_t)1;
 
       _writeReg(self, di->rd, _readPC(self) + di->size);
       _writePC(self, target - di->size);
@@ -907,6 +907,8 @@ static inline void _doILL(RV64_Cpu* self, const struct _instr *di) {
   (void)di;
 
   _trap(self, MCAUSE_INST_ILL, false);
+
+  DEBUG("RV: ILL PC: %" PRI_CPU_PTR, _readPC(self));
   assert(false);
 }
 
