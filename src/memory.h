@@ -15,6 +15,7 @@
 #ifdef CONFIG_DOS
 
 #include <stdio.h>
+#include <i86.h>
 
 #define MEM_PAGES 80
 
@@ -25,7 +26,7 @@
 #define MEM_PAGE_OFFSET_MASK (MEM_PAGE_SIZE - 1UL)
 #define MEM_PAGE_ADDR_MASK (~MEM_PAGE_OFFSET_MASK)
 
-#define MEM_SWAP_IO_BUF_SIZE 4096
+typedef int _dosFileHandle;
 
 #endif
 
@@ -34,15 +35,14 @@ typedef struct {
   struct _memPage {
     unsigned long int addr;   // No need to keep long pointers because of file system limitations
     bool dirty;
-    char __far* data;
+    __libi86_fpc_t data;
 
     struct _memPage *next;
     struct _memPage *prev;
   } pages[MEM_PAGES];
   struct _memPage *lruListHead;
 
-  FILE *swap;
-  uint8_t *localPage;
+  _dosFileHandle swap;
 
 #ifdef MEMORY_STATS
   uint32_t pageLookups;

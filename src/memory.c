@@ -13,7 +13,80 @@
 
 #ifdef CONFIG_DOS
 
-#include <malloc.h>
+#include <libi86/malloc.h>
+#include <libi86/string.h>
+#include <dos.h>
+#include <sys/fcntl.h>
+
+static inline _dosFileHandle _dosFOpen(const char *name) {
+  int handle = -1;
+
+  if(_dos_open(name, O_RDWR, &handle) == 0)
+    return handle;
+
+  if(_dos_creat(name, 0, &handle) == 0)
+    return handle;
+
+  return -1;
+}
+
+static inline void _dosFClose(_dosFileHandle file) {
+  _dos_close(file);
+}
+
+static inline unsigned int _dosFRead(_dosFileHandle file, __libi86_fpc_t buffer, unsigned int size) {
+  unsigned int read = 0;
+
+  _dos_read(file, buffer, size, &read);
+
+  return read;
+}
+
+static inline unsigned int _dosFWrite(_dosFileHandle file, const __libi86_fpcc_t buffer, unsigned int size) {
+  unsigned int written = 0;
+
+  _dos_write(file, buffer, size, &written);
+
+  return written;
+}
+
+#define DOS_SEEK_SET 0
+#define DOS_SEEK_CUR 1
+#define DOS_SEEK_END 2
+
+static inline int _dosFSeek(_dosFileHandle file, long int offset, int whence) {
+  union REGS r;
+
+  r.h.ah = 0x42;
+  r.h.al = whence;
+  r.x.bx = file;
+  r.x.dx = (unsigned int)offset;
+  r.x.cx = ((unsigned long int)offset) >> 16;
+
+  int86(0x21, &r, &r);
+
+  if(r.x.cflag)
+    return -1;
+
+  return 0;
+}
+
+static inline long int _dosFTell(_dosFileHandle file) {
+  union REGS r;
+
+  r.h.ah = 0x42;
+  r.h.al = DOS_SEEK_CUR;
+  r.x.bx = file;
+  r.x.dx = 0;
+  r.x.cx = 0;
+
+  int86(0x21, &r, &r);
+
+  if(r.x.cflag)
+    return -1;
+
+  return (long int)(((unsigned long int)r.x.dx << 16) | (unsigned long int)r.x.ax);
+}
 
 static inline void _dirtyPage(struct _memPage *page) {
   page->dirty = true;
@@ -40,14 +113,12 @@ static inline void _storePage(Memory* self, struct _memPage *page) {
   ++self->pageWrites;
 #endif
 
-  if(fseek(self->swap, (long int)page->addr, SEEK_SET) != 0) {
+  if(_dosFSeek(self->swap, (long int)page->addr, DOS_SEEK_SET) != 0) {
     ERROR("Mem: Failed to seek swap");
     return;
   }
 
-  _fmemcpy(self->localPage, page->data, MEM_PAGE_SIZE);
-
-  if(fwrite(self->localPage, MEM_PAGE_SIZE, 1, self->swap) != 1) {
+  if(_dosFWrite(self->swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
     ERROR("Mem: Failed to write page to swap");
     return;
   }
@@ -56,17 +127,15 @@ static inline void _storePage(Memory* self, struct _memPage *page) {
 }
 
 static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _memPage *page) {
-  if(fseek(self->swap, (long int)pageAddr, SEEK_SET) != 0) {
+  if(_dosFSeek(self->swap, (long int)pageAddr, DOS_SEEK_SET) != 0) {
     ERROR("Mem: Failed to seek swap");
     return;
   }
 
-  if(fread(self->localPage, MEM_PAGE_SIZE, 1, self->swap) != 1) {
+  if(_dosFRead(self->swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
     ERROR("Mem: Failed to read page from swap");
     return;
   }
-
-  _fmemcpy(page->data, self->localPage, MEM_PAGE_SIZE);
 
   page->addr = pageAddr;
   page->dirty = false;
@@ -130,7 +199,7 @@ bool mem_init(Memory* self, cpu_size_t size)
 
   for(int i = 0; i < MEM_PAGES; ++i) {
     self->pages[i].data = _fmalloc(MEM_PAGE_SIZE);
-    if(!self->pages[i].data) {
+    if(__libi86_FP_EQ_NULL(self->pages[i].data)) {
       ERROR("Failed to allocate memory page");
       mem_destroy(self);
       return false;
@@ -139,37 +208,22 @@ bool mem_init(Memory* self, cpu_size_t size)
     _fmemset(self->pages[i].data, 0, MEM_PAGE_SIZE);
   }
 
-  self->localPage = calloc(1, MEM_PAGE_SIZE);
-  if(!self->localPage) {
-    ERROR("Failed to allocate local page");
-    mem_destroy(self);
-    return false;
-  }
-
   INFO("Mem: Initializing swap file %s", swapFile);
 
-  self->swap = fopen(swapFile, "a+b");
-  if(!self->swap) {
+  self->swap = _dosFOpen(swapFile);
+  if(self->swap < 0) {
     ERROR("Failed to create swap file");
     mem_destroy(self);
     return false;
   }
-  fclose(self->swap);
 
-  self->swap = fopen(swapFile, "r+b");
-  if(!self->swap) {
-    ERROR("Failed to open swap file");
-    mem_destroy(self);
-    return false;
-  }
-
-  setvbuf(self->swap, NULL, _IOFBF, MEM_SWAP_IO_BUF_SIZE);
-
-  fseek(self->swap, 0, SEEK_END);
-  long int swapPos = ftell(self->swap);
+  _dosFSeek(self->swap, 0, DOS_SEEK_END);
+  long int swapPos = _dosFTell(self->swap);
 
   for(int n = 0; swapPos < size; swapPos += MEM_PAGE_SIZE) {
-    if(fwrite(self->localPage, 1, MEM_PAGE_SIZE, self->swap) != MEM_PAGE_SIZE) {
+    char buf[MEM_PAGE_SIZE] = {0};
+
+    if(_dosFWrite(self->swap, buf, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
       ERROR("Failed to write swap file");
       mem_destroy(self);
       return false;
@@ -210,16 +264,14 @@ bool mem_init(Memory* self, cpu_size_t size)
 void mem_destroy(Memory *self) {
 #ifdef CONFIG_DOS
   for(int i = 0; i < MEM_PAGES; ++i) {
-    if(self->swap && self->localPage)
+    if(self->swap)
       _storePage(self, self->pages + i);
 
     _ffree(self->pages[i].data);
   }
 
-  if(self->swap)
-    fclose(self->swap);
-
-  free(self->localPage);
+  if(self->swap >= 0)
+    _dosFClose(self->swap);
 
 #ifdef MEMORY_STATS
   DEBUG("Mem stats:\n\tpageLookups:\t%" PRIu32 "\n\tpageHits:\t%" PRIu32 "\n\tpageMisses:\t%" PRIu32 "\n\tpageWrites:\t%" PRIu32,
