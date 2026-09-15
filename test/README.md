@@ -40,7 +40,7 @@ It has been built and run for real (not just hand-checked) with:
   convenient way to sanity-check the binary before trying it on real
   hardware or another simulator.
 
-Current total: **949 result lines**, all passing.
+Current total: **1110 result lines**, all passing.
 
 ## The RVC suite
 
@@ -121,41 +121,85 @@ chosen registers/immediate don't fit the format.
 
 ## The base-ISA suite
 
-RV64I's load instructions, in `base_loads.S`: `LB`, `LH`, `LW`, `LD`,
-`LBU`, `LHU`, `LWU`.
+RV64I's load and store instructions:
+- **`base_loads.S`**: `LB`, `LH`, `LW`, `LD`, `LBU`, `LHU`, `LWU`
+- **`base_stores.S`**: `SB`, `SH`, `SW`, `SD`
+- **`base_lui.S`**: `LUI`
+- **`base_auipc.S`**: `AUIPC`
 
 Base-ISA instructions have a genuinely different risk profile than
 RVC ones, which shapes the coverage differently:
 
-- **No restricted register fields** — `rd` and `rs1` are each a full,
+- **No restricted register fields** — `rd`/`rs1`/`rs2` are each a full,
   independent 5-bit field, so there's no 3-bit-field decode risk, but
-  a wrong bit in a 5-bit field is still possible, so each of `rd` and
-  `rs1` still gets an independent sweep across a representative sample
-  of registers (not exhaustively all 32 — the same "representative
-  sample, not full sweep" approach used for RVC's full-5-bit fields
-  like `C.ADDI`/`C.MV`/`C.JALR`).
+  a wrong bit in a 5-bit field is still possible, so each register
+  operand still gets an independent sweep across a representative
+  sample of registers (not exhaustively all 32 — the same
+  "representative sample, not full sweep" approach used for RVC's
+  full-5-bit fields like `C.ADDI`/`C.MV`/`C.JALR`).
 - **No scrambled immediate** — the 12-bit offset is one contiguous
   field, so it only needs boundary values (`+2047`/`-2048`) and a
   couple of representative in-between ones, not an exhaustive per-bit
   sweep the way RVC's scattered encodings needed.
-- **Sign vs. zero extension is where the real bugs live.** This
-  project's own test-writing history includes more than one sign/zero
-  mixup (`lw` vs `lwu` used to verify a store, twice), so `LB`/`LH`/`LW`
-  and their `U`-suffixed counterparts are tested with the *exact same*
-  underlying byte patterns, so an accidental swap between sign- and
-  zero-extension is immediately visible as a mismatched expected
-  value rather than something that could quietly pass.
-- **`rd=x0` is tested once per instruction** — confirms it doesn't
-  fault and genuinely discards the loaded value.
+- **Sign vs. zero extension (loads) / discarded upper bits (stores)
+  is where the real bugs live.** This project's own test-writing
+  history includes more than one sign/zero mixup (`lw` vs `lwu` used
+  to verify a store, twice), so `LB`/`LH`/`LW` and their `U`-suffixed
+  counterparts are tested with the *exact same* underlying byte
+  patterns, so an accidental swap between sign- and zero-extension is
+  immediately visible as a mismatched expected value rather than
+  something that could quietly pass. Stores have a direct analog even
+  though there's no sign-extension question for a *write*: `SB`/`SH`/
+  `SW` must use only the low 8/16/32 bits of `rs2` and discard
+  whatever garbage is sitting above that, which each gets an explicit
+  test for (a source register loaded with distinctive nonzero upper
+  bits, confirming only the intended low bits land in memory).
+- **`rd=x0` (loads) / `rs2=x0` (stores) is tested once per
+  instruction** — for loads, confirms it doesn't fault and genuinely
+  discards the loaded value; for stores, confirms storing the
+  always-zero register (a common real pattern) actually writes zero.
 - **`rs1=x0` is deliberately not tested** — address `0` is unmapped in
   this memory map (RAM starts at `0x80000000`) and there's no
-  load-access-fault handler, so it would hang rather than usefully
-  fail.
+  access-fault handler, so it would hang rather than usefully fail.
 - **Offsets are not constrained to natural alignment** for the width
-  being loaded. The RISC-V base ISA permits (without mandating
+  being loaded/stored. The RISC-V base ISA permits (without mandating
   hardware support for) misaligned accesses, and QEMU's TCG emulation
   handles them transparently — this is not guaranteed portable to all
   real hardware; see "Porting" below.
+- **Stores additionally get an adjacent-memory-untouched invariant**
+  (sentinel doublewords on both sides of the target, confirming the
+  store touches exactly its width and nothing else) and `rs1`/`rs2`
+  preservation checks (a store never writes back to either operand
+  register) — the same treatment `C.SW`/`C.SD` got in the RVC suite.
+- **`LUI` is the one place `rd=sp` gets tested**, since that's the
+  actual behavioral difference between it and its compressed cousin
+  `C.LUI` (which reserves `rd=x2`/`sp` for `C.ADDI16SP` instead — LUI
+  has no such restriction). Handled carefully so `sp` never holds a
+  non-stack-pointer value across a subroutine call: poison, execute,
+  capture the result, restore the real `sp`, and only then call into
+  `check()`. `LUI`'s 20-bit immediate is also a plain, non-scrambled
+  field like the load/store offsets, so it gets the same "boundary
+  values plus a representative sample" treatment rather than an
+  exhaustive per-bit sweep — including both sides of the sign bit
+  (bit 19 of the 20-bit field), which determines whether the result
+  sign-extends.
+- **`AUIPC` shares `LUI`'s immediate encoding exactly, but the result
+  is PC-relative** (`rd = pc + sign_extend(imm20 << 12)`, where `pc`
+  is the AUIPC instruction's own address) — which means, unlike every
+  other instruction in this suite, the expected value for a given test
+  case isn't known until the code is actually linked. Every AUIPC test
+  computes its own expectation at *runtime* instead of hardcoding one:
+  a local label placed exactly at the AUIPC instruction gives its true
+  address via `la`, and the immediate's contribution (the same
+  sign-extended delta `LUI` would produce for the same value) is added
+  to that. There's also a test that doesn't depend on knowing any
+  absolute address at all: two AUIPCs with the *same* immediate at two
+  different code locations must differ by exactly the byte distance
+  between them, since the immediate's contribution cancels out — this
+  is the one test that would actually catch an implementation that
+  computed AUIPC as if it were LUI, ignoring `pc` entirely (both
+  results would come out identical instead of differing by the
+  inter-instruction distance).
 
 Every mnemonic in this suite is written with `.option norvc` active
 for the entire file — not just style, but a functional requirement:
@@ -166,19 +210,32 @@ was verified empirically (an `lw`/`ld` pair with compressible operands
 confirmed to stay 4 bytes wide under `.option norvc`) before relying
 on it throughout the suite.
 
-A real bug turned up while building this suite, worth knowing about if
-you extend it: the `*_RS1` macro family (which sweeps the base
-register while storing a fixed test value first) originally used `t0`
-as the "value to store" scratch register — but `t0` is *also* one of
-the swept `basereg` candidates. When `basereg == t0`, loading the test
-value into `t0` destroyed the address that had just been computed
-there, and the subsequent store faulted (`mcause 7`, store/AMO access
-fault) instead of writing to the intended buffer. Fixed by using `t1`
-(not in the sweep list) for the scratch value instead. This is the
-same general class of bug as several `a0`/`a1`/`a2` collisions caught
-in the RVC suite's history — a fixed helper register colliding with a
-register under test in the sweep — just showing up with a different
-register pair here.
+Two real bugs turned up while building this suite, both the same
+underlying mistake in different clothes, worth knowing about if you
+extend it further: a macro that sweeps register X while using a fixed
+*other* register Y as scratch is broken if Y ever appears as one of
+the values X is swept across.
+
+- In `base_loads.S`'s `*_RS1` macro family (sweeps the base register
+  while storing a fixed test value first), the scratch value register
+  was originally `t0` — but `t0` is also one of the swept `basereg`
+  candidates. When `basereg == t0`, loading the test value into `t0`
+  destroyed the address just computed there, and the store faulted
+  (`mcause 7`, store/AMO access fault). Fixed by moving the scratch to
+  `t1` (not in the sweep list).
+- In `base_stores.S`'s `*_RS2` macro family (sweeps the value register
+  while using a fixed base address), the fixed base was originally
+  `s0` — but `s0` is also one of the swept `rs2reg` candidates. Same
+  fault, same fix shape: moved the fixed base to `s1` (not in the
+  sweep list).
+
+Both were caught the same way: an actual QEMU run hit an unexpected
+trap, not a code review. If you write a similar sweep-plus-fixed-helper
+macro, double check the helper register never collides with anything
+in the corresponding call sites' register list — this class of bug has
+now shown up three times across this project (the third instance, with
+`a0`/`a1`/`a2` colliding with swept registers, is documented in the
+RVC suite's own history in earlier revisions of this file).
 
 ## Building
 
@@ -197,9 +254,12 @@ riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_quadrant1.
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o rvc_quadrant2.o rvc_quadrant2.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_tests.o base_tests.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_loads.o base_loads.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_stores.o base_stores.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_lui.o base_lui.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_auipc.o base_auipc.S
 riscv64-linux-gnu-ld -Ttext=0x80000000 --no-dynamic-linker -nostdlib \
     -o rvc_test.elf common.o main_tests.o rvc_tests.o rvc_quadrant0.o rvc_quadrant1.o \
-    rvc_quadrant2.o base_tests.o base_loads.o
+    rvc_quadrant2.o base_tests.o base_loads.o base_stores.o base_lui.o base_auipc.o
 riscv64-linux-gnu-objcopy -O binary rvc_test.elf rvc_test.bin
 ```
 
@@ -233,7 +293,8 @@ point. To add a new suite (say, the `M` extension):
 1. Write your own top-level file (e.g. `m_tests.S`) with
    `.global run_m_tests`, printing its own banner and calling into one
    or more category files the same way `rvc_tests.S` calls into
-   `rvc_quadrant0/1/2.S` or `base_tests.S` calls into `base_loads.S`.
+   `rvc_quadrant0/1/2.S` or `base_tests.S` calls into `base_loads.S`/
+   `base_stores.S`/`base_lui.S`/`base_auipc.S`.
    Use `check`/`uart_puts` from `common.S` the same way the existing
    suites do. Split it into multiple files if it's large enough to
    benefit — each category file should expose exactly one entry symbol
@@ -292,13 +353,13 @@ your target:
 
 Additionally, for the base-ISA load suite specifically:
 
-4. **Misaligned loads are assumed not to trap.** `base_loads.S` tests
-   offsets like `+4`/`-4` against 8-byte `LD` loads, which QEMU handles
-   transparently but real hardware may legitimately fault on (the
-   RISC-V base ISA permits, but does not require, misaligned-access
-   support). There's no misaligned-access-fault handler here, so on
-   hardware that traps, these specific cases would hang rather than
-   fail cleanly.
+4. **Misaligned loads/stores are assumed not to trap.** `base_loads.S`
+   and `base_stores.S` test offsets like `+4`/`-4` against 8-byte
+   `LD`/`SD` accesses, which QEMU handles transparently but real
+   hardware may legitimately fault on (the RISC-V base ISA permits,
+   but does not require, misaligned-access support). There's no
+   misaligned-access-fault handler here, so on hardware that traps,
+   these specific cases would hang rather than fail cleanly.
 
 ## Files
 
@@ -309,6 +370,9 @@ Additionally, for the base-ISA load suite specifically:
   per-instruction test bodies, one file per RVC opcode quadrant.
 - `base_tests.S` — base-ISA suite orchestrator (defines `run_base_tests`).
 - `base_loads.S` — the base-ISA load instruction test bodies.
+- `base_stores.S` — the base-ISA store instruction test bodies.
+- `base_lui.S` — the `LUI` test body.
+- `base_auipc.S` — the `AUIPC` test body.
 - `Makefile` — build/run/disasm/clean targets.
 - `rvc_test.bin` — prebuilt flat binary, ready to load at `0x80000000`.
 - `rvc_test.elf` — the linked ELF (handy for `objdump -d` / debugging
