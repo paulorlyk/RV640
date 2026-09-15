@@ -5,10 +5,10 @@
  * Mirrors rvc_tests.S's role, one level up: defines run_base_tests,
  * the entry point main_tests.S calls into, which prints a banner and
  * calls each category file's entry point in turn. Category files
- * (base_loads.S, base_stores.S, base_lui.S, base_auipc.S so far; more
- * can be added the same way RVC's quadrant0/1/2 files were) each
- * expose exactly one symbol and keep their own macros/subroutines/data
- * local.
+ * (base_loads.S, base_stores.S, base_lui.S, base_auipc.S, base_jal.S
+ * so far; more can be added the same way RVC's quadrant0/1/2 files
+ * were) each expose exactly one symbol and keep their own
+ * macros/subroutines/data local.
  *
  * Every instruction here is written with .option norvc active
  * throughout its file, which is what actually matters for a suite
@@ -36,6 +36,9 @@ run_base_tests:
     jal     ra, tests_base_stores
     jal     ra, tests_base_lui
     jal     ra, tests_base_auipc
+    jal     ra, tests_base_jal
+    jal     ra, tests_base_jalr
+    jal     ra, tests_base_branches
 
     ld      ra, 0(sp)
     addi    sp, sp, 16

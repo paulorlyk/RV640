@@ -40,7 +40,7 @@ It has been built and run for real (not just hand-checked) with:
   convenient way to sanity-check the binary before trying it on real
   hardware or another simulator.
 
-Current total: **1110 result lines**, all passing.
+Current total: **1275 result lines**, all passing.
 
 ## The RVC suite
 
@@ -126,6 +126,9 @@ RV64I's load and store instructions:
 - **`base_stores.S`**: `SB`, `SH`, `SW`, `SD`
 - **`base_lui.S`**: `LUI`
 - **`base_auipc.S`**: `AUIPC`
+- **`base_jal.S`**: `JAL`
+- **`base_jalr.S`**: `JALR`
+- **`base_branches.S`**: `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU`
 
 Base-ISA instructions have a genuinely different risk profile than
 RVC ones, which shapes the coverage differently:
@@ -200,6 +203,76 @@ RVC ones, which shapes the coverage differently:
   computed AUIPC as if it were LUI, ignoring `pc` entirely (both
   results would come out identical instead of differing by the
   inter-instruction distance).
+- **`JAL` combines two dimensions the RVC suite tested separately**: a
+  PC-relative jump offset (like `C.J`) and a link register (like
+  `C.JALR`, except `JAL`'s `rd` is a full 5-bit field — any register,
+  not fixed to `ra`). Each register in the `rd` sweep is checked two
+  ways independently: did execution land at the target, and does `rd`
+  hold exactly this `JAL`'s own address + 4. `rd=x0` — the standard
+  "plain unconditional jump" idiom — is tested as a first-class case
+  rather than a degenerate one. Unlike the RVC branch/jump
+  instructions, there's no assembler-relaxation boundary to worry
+  about here: `JAL` has no RV64 compressed form at all (`C.JAL` is
+  RV32C-only; RV64C reuses that opcode slot for `C.ADDIW`), so every
+  `JAL` is unconditionally 4 bytes with nothing smaller the assembler
+  could have substituted.
+
+  **Scope note:** `JAL`'s 20-bit offset spans roughly ±1MB. Walking
+  every bit of it exhaustively — the treatment `C.J` got — would mean
+  constructing filler runs up to ~512KB for the top bit alone, a bad
+  trade for a test binary meant to build and run quickly. So this file
+  sweeps every bit of the low 12 (magnitudes 4–4096 forward, 8–4096
+  backward; backward's bookkeeping overhead means `-4` isn't
+  constructible the way `+4` is), plus one dedicated test for the
+  low-order bit a run of 4-byte fillers can never reach on its own
+  (offset ≡ 2 mod 4, needing a single inert 2-byte `c.nop` as padding
+  — not under test itself). The higher-order bits use the identical
+  encoding mechanism, just at a scale not worth the binary size.
+- **`JALR` is register-relative, not PC-relative**, which changes the
+  coverage in three ways that make it more than a copy of `JAL`'s
+  structure. Its 12-bit immediate is a plain contiguous field and the
+  target is computed from a register, so the *full* −2048..+2047 range
+  is cheap to sweep at the boundaries — no enormous filler runs needed
+  (each case computes its base as `target − imm` at runtime, so the
+  jump lands on the label whatever the immediate). The low bit of the
+  computed target is **cleared** (`& ~1`), not preserved, which is easy
+  to get wrong and is tested directly from both directions: a base
+  register set to `(label | 1)`, and an odd bit arriving via the
+  immediate instead. And `rd == rs1` is a genuine hazard — the old
+  `rs1` must be read as the target *before* `rd` is overwritten with
+  the link address, or the jump goes to the link address instead — so
+  that aliasing case gets its own landed-and-link pair of checks.
+  There's also a real call/return round trip using `JALR` in both
+  roles. `.option norvc` is genuinely load-bearing in this file rather
+  than just conventional: `JALR` *does* have compressed forms
+  (`C.JR`/`C.JALR`) that the assembler would otherwise substitute for
+  the `imm=0` cases, silently testing the RVC instruction instead of
+  this one — verified by disassembly that zero compressed forms leaked
+  in. The three-operand `jalr rd, rs1, imm` form is used throughout
+  rather than the `ret`/`jr` pseudo-instructions, so what's under test
+  is unambiguous.
+- **The six branches share one B-type encoding** and differ only in
+  the comparison in `funct3`, so the coverage is organised around what
+  actually distinguishes them rather than repeating an identical
+  offset sweep six times. All six are run against the *same* set of
+  operand pairs with the expected taken/not-taken outcome spelled out
+  for each, so a decoder that swaps two of them (`BLT` for `BGE`, or
+  `BLTU` for `BLT`) produces a visible mismatch instead of quietly
+  passing. The headline cases are the **signed/unsigned divergences**:
+  `BLT`/`BGE` compare as signed, `BLTU`/`BGEU` compare the same bits
+  as unsigned, so operands like `rs1=-1, rs2=1` give opposite answers
+  — signed, `-1 < 1` so `BLT` is taken; unsigned, `0xffff...f > 1` so
+  `BLTU` is *not*. `INT64_MIN` vs `INT64_MAX` and `-1` vs `0` are the
+  other such pairs. These are precisely what catches a signed/unsigned
+  mixup, the bug class that has bitten this project's own test code
+  more than once. Equal operands are covered for all six too, since
+  that's where the strict/non-strict split shows up (`BLT` not taken
+  vs `BGE` taken on `x == x`). The B-type offset field is identical
+  across all six, so it's swept once through `BEQ` rather than six
+  times over. `.option norvc` is load-bearing here as well: `BEQ`/`BNE`
+  against `x0` with an `x8`-`x15` register would otherwise be
+  substituted with `C.BEQZ`/`C.BNEZ` — verified by disassembly that
+  zero compressed forms leaked in.
 
 Every mnemonic in this suite is written with `.option norvc` active
 for the entire file — not just style, but a functional requirement:
@@ -257,9 +330,12 @@ riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_loads.o b
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_stores.o base_stores.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_lui.o base_lui.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_auipc.o base_auipc.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_jal.o base_jal.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_jalr.o base_jalr.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_branches.o base_branches.S
 riscv64-linux-gnu-ld -Ttext=0x80000000 --no-dynamic-linker -nostdlib \
     -o rvc_test.elf common.o main_tests.o rvc_tests.o rvc_quadrant0.o rvc_quadrant1.o \
-    rvc_quadrant2.o base_tests.o base_loads.o base_stores.o base_lui.o base_auipc.o
+    rvc_quadrant2.o base_tests.o base_loads.o base_stores.o base_lui.o base_auipc.o base_jal.o base_jalr.o base_branches.o
 riscv64-linux-gnu-objcopy -O binary rvc_test.elf rvc_test.bin
 ```
 
@@ -294,7 +370,7 @@ point. To add a new suite (say, the `M` extension):
    `.global run_m_tests`, printing its own banner and calling into one
    or more category files the same way `rvc_tests.S` calls into
    `rvc_quadrant0/1/2.S` or `base_tests.S` calls into `base_loads.S`/
-   `base_stores.S`/`base_lui.S`/`base_auipc.S`.
+   `base_stores.S`/`base_lui.S`/`base_auipc.S`/`base_jal.S`/`base_jalr.S`/`base_branches.S`.
    Use `check`/`uart_puts` from `common.S` the same way the existing
    suites do. Split it into multiple files if it's large enough to
    benefit — each category file should expose exactly one entry symbol
@@ -373,6 +449,9 @@ Additionally, for the base-ISA load suite specifically:
 - `base_stores.S` — the base-ISA store instruction test bodies.
 - `base_lui.S` — the `LUI` test body.
 - `base_auipc.S` — the `AUIPC` test body.
+- `base_jal.S` — the `JAL` test body.
+- `base_jalr.S` — the `JALR` test body.
+- `base_branches.S` — the conditional-branch test bodies.
 - `Makefile` — build/run/disasm/clean targets.
 - `rvc_test.bin` — prebuilt flat binary, ready to load at `0x80000000`.
 - `rvc_test.elf` — the linked ELF (handy for `objdump -d` / debugging

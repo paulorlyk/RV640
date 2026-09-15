@@ -31,6 +31,15 @@ struct _instr {
   uint32_t simm;
 };
 
+static inline void _doILL(RV64_Cpu* self, const struct _instr *di) {
+  (void)di;
+
+  _trap(self, MCAUSE_INST_ILL, false);
+
+  DEBUG("RV: ILL PC: %" PRI_CPU_PTR, _readPC(self));
+  assert(false);
+}
+
 static inline void _doJAL(RV64_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->jimm, 20, cpu_word_t);
   const cpu_addr_t pc = _readPC(self);
@@ -83,10 +92,10 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
           break;
         }
 
-        default:
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+        default: {
+          _doILL(self, di);
           break;
+        }
       }
       break;
     }
@@ -145,8 +154,7 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
@@ -159,8 +167,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
         // FENCE.I
         _flushIcache(self);
       } else {
-        _trap(self, MCAUSE_INST_ILL, false);
-        assert(false);
+        _doILL(self, di);
       }
       break;
     }
@@ -169,8 +176,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
       // CBO
       switch(di->iimm) {
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
 
@@ -180,8 +186,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
             static const uint8_t zero[DCACHE_LINE_SIZE] = {0};
             _writeMem(self, _readReg(self, di->rs1), zero, sizeof(zero));
           } else {
-            _trap(self, MCAUSE_INST_ILL, false);
-            assert(false);
+            _doILL(self, di);
           }
           break;
         }
@@ -190,8 +195,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      // _trap(self, MCAUSE_INST_ILL, false);
-      // assert(false);
+      // _doILL(self, di);
       break;
     }
   }
@@ -212,8 +216,7 @@ static inline void _doOPIMM(RV64_Cpu* self, const struct _instr *di) {
         // SLLI
         _writeReg(self, di->rd, rs1 << (di->iimm & 0x3F));
       } else {
-        _trap(self, MCAUSE_INST_ILL, false);
-        assert(false);
+        _doILL(self, di);
       }
       break;
     }
@@ -241,8 +244,7 @@ static inline void _doOPIMM(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -306,8 +308,7 @@ static inline void _doBRANCH(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
@@ -337,8 +338,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         case 32: _writeReg(self, di->rd, rs1 - rs2); break;
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -382,8 +382,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -395,8 +394,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         // SLT
         _writeReg(self, di->rd, (cpu_sword_t)rs1 < (cpu_sword_t)rs2);
       } else {
-        _trap(self, MCAUSE_INST_ILL, false);
-        assert(false);
+        _doILL(self, di);
       }
       break;
     }
@@ -427,8 +425,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -454,8 +451,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -485,8 +481,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -512,8 +507,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -535,8 +529,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -558,8 +551,7 @@ static inline void _doJALR(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
@@ -590,8 +582,7 @@ static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
         const uint32_t res = rs1 << (di->iimm & 0x1F);
         _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
       } else {
-        _trap(self, MCAUSE_INST_ILL, false);
-        assert(false);
+        _doILL(self, di);
       }
       break;
     }
@@ -615,8 +606,7 @@ static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -624,8 +614,7 @@ static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
@@ -634,7 +623,7 @@ static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
 static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
   if(size != 4 && size != 8) {
-    _trap(self, MCAUSE_INST_ILL, false);
+    _doILL(self, di);
     return;
   }
 
@@ -671,7 +660,7 @@ static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
     case 2: {
       // LR.x
       if(di->rs2) {
-        _trap(self, MCAUSE_INST_ILL, false);
+        _doILL(self, di);
         break;
       }
 
@@ -715,8 +704,7 @@ static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
@@ -730,7 +718,7 @@ static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
 static inline void _doSTORE(RV64_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
   if(size > 8) {
-    _trap(self, MCAUSE_INST_ILL, false);
+    _doILL(self, di);
     return;
   }
 
@@ -773,8 +761,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         case 32: _writeReg(self, di->rd, SIGN_EXTEND(rs1 - rs2, 31, cpu_word_t)); break;
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -787,8 +774,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         case 0: _writeReg(self, di->rd, SIGN_EXTEND(rs1 << (rs2 & 0x3F), 31, cpu_word_t)); break;
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -811,8 +797,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -843,8 +828,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -867,8 +851,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -887,8 +870,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
         }
 
         default: {
-          _trap(self, MCAUSE_INST_ILL, false);
-          assert(false);
+          _doILL(self, di);
           break;
         }
       }
@@ -896,20 +878,10 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
+      _doILL(self, di);
       break;
     }
   }
-}
-
-static inline void _doILL(RV64_Cpu* self, const struct _instr *di) {
-  (void)di;
-
-  _trap(self, MCAUSE_INST_ILL, false);
-
-  DEBUG("RV: ILL PC: %" PRI_CPU_PTR, _readPC(self));
-  assert(false);
 }
 
 static inline void _execInstr(RV64_Cpu* self, uint32_t instr) {

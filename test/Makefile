@@ -27,12 +27,16 @@
 #   base_tests.S      - RV64I base-ISA suite orchestrator; defines
 #                       run_base_tests, calls tests_base_loads/
 #                       tests_base_stores/tests_base_lui/
-#                       tests_base_auipc (and future base-ISA category
-#                       files the same way).
+#                       tests_base_auipc/tests_base_jal/tests_base_jalr
+#                       (and future
+#                       base-ISA category files the same way).
 #   base_loads.S      - LB, LH, LW, LD, LBU, LHU, LWU
 #   base_stores.S     - SB, SH, SW, SD
 #   base_lui.S        - LUI
 #   base_auipc.S      - AUIPC
+#   base_jal.S        - JAL
+#   base_jalr.S       - JALR
+#   base_branches.S   - BEQ, BNE, BLT, BGE, BLTU, BGEU
 #
 # Future instruction-set suites (e.g. an "M" extension test) can be
 # added as their own file(s) defining run_yyy_tests, with one new line
@@ -52,7 +56,7 @@ BUILD_DIR   = build
 
 COMMON_SRC  = common.S
 SUITE_SRCS  = main_tests.S rvc_tests.S rvc_quadrant0.S rvc_quadrant1.S rvc_quadrant2.S \
-              base_tests.S base_loads.S base_stores.S base_lui.S base_auipc.S
+              base_tests.S base_loads.S base_stores.S base_lui.S base_auipc.S base_jal.S base_jalr.S base_branches.S
 SUITE_OBJS  = $(addprefix $(BUILD_DIR)/,$(SUITE_SRCS:.S=.o))
 COMMON_OBJ  = $(BUILD_DIR)/common.o
 OUT         = $(BUILD_DIR)/rvc_test
