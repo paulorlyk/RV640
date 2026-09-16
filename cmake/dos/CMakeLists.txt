@@ -35,6 +35,10 @@ target_compile_options(${EXECUTABLE_8086} PRIVATE
 #    "-S"
 )
 
+target_include_directories(${EXECUTABLE_8086} PRIVATE
+    "/usr/ia16-elf/include"
+)
+
 target_link_libraries(${EXECUTABLE_8086} PRIVATE
     "i86"
 )
