@@ -34,6 +34,7 @@ typedef uint64_t cpu_size_t;
 #endif
 
 #define PRI_CPU_XWORD PRIx64
+#define PRI_CPU_UWORD PRIu64
 
 typedef enum {
   CPU_REG_X0 = 0,

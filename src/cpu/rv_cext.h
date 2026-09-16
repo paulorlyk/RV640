@@ -29,7 +29,7 @@ static inline void _cextNop(RV64_Cpu* self, struct _instr *di) {
 }
 
 static inline void _doCextQ0_0(RV64_Cpu* self, unsigned int instr, struct _instr *di) {
-  const uint32_t imm = ((instr >> 2) & (1LU << 3)) | ((instr >> 4) & (1LU << 2)) | ((instr >> 1) & (1LU << 2)) | ((instr >> 1) & (0xFLU << 6)) | ((instr >> 7) & (0x3LU << 4));
+  const uint32_t imm = ((instr >> 2) & (1LU << 3)) | ((instr >> 4) & (1LU << 2)) | ((instr >> 1) & (0xFLU << 6)) | ((instr >> 7) & (0x3LU << 4));
   if(imm) {
     // c.addi4spn -> addi rd', x2, imm[9:2]
     di->funct3 = 0;
