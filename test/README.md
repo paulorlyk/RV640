@@ -40,7 +40,7 @@ It has been built and run for real (not just hand-checked) with:
   convenient way to sanity-check the binary before trying it on real
   hardware or another simulator.
 
-Current total: **1275 result lines**, all passing.
+Current total: **1367 result lines**, all passing.
 
 ## The RVC suite
 
@@ -129,6 +129,7 @@ RV64I's load and store instructions:
 - **`base_jal.S`**: `JAL`
 - **`base_jalr.S`**: `JALR`
 - **`base_branches.S`**: `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU`
+- **`base_op_alu.S`**: `ADD`, `SUB`, `SLL`, `SLT`, `SLTU`, `XOR`, `SRL`, `SRA`, `OR`, `AND`
 
 Base-ISA instructions have a genuinely different risk profile than
 RVC ones, which shapes the coverage differently:
@@ -273,6 +274,19 @@ RVC ones, which shapes the coverage differently:
   against `x0` with an `x8`-`x15` register would otherwise be
   substituted with `C.BEQZ`/`C.BNEZ` — verified by disassembly that
   zero compressed forms leaked in.
+- **`base_op_alu.S`'s ten R-type ALU instructions share one encoding**
+  and differ only in the operation, so — the same idea as the branch
+  file — the register fields (`rd`/`rs1`/`rs2` and every aliasing
+  combination) are swept *once*, through `ADD`, rather than ten times
+  over; the real per-instruction depth goes into each operation's own
+  correctness. `SLL`/`SRL`/`SRA` get a specific, easy-to-get-wrong
+  check: only the low 6 bits of `rs2` select the shift amount, so
+  `rs2=64` must behave identically to `rs2=0`, and `rs2=65` to `rs2=1`
+  — tested directly rather than assumed. `SLT`/`SLTU` get the same
+  signed/unsigned divergence pairs used for `BLT`/`BLTU`, for the same
+  reason. `.option norvc` matters here too — several of these have
+  direct compressed equivalents among `x8`-`x15` registers that the
+  assembler would otherwise substitute.
 
 Every mnemonic in this suite is written with `.option norvc` active
 for the entire file — not just style, but a functional requirement:
@@ -333,9 +347,10 @@ riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_auipc.o b
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_jal.o base_jal.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_jalr.o base_jalr.S
 riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_branches.o base_branches.S
+riscv64-linux-gnu-as -march=rv64imac_zicsr_zifencei -mabi=lp64 -o base_op_alu.o base_op_alu.S
 riscv64-linux-gnu-ld -Ttext=0x80000000 --no-dynamic-linker -nostdlib \
     -o rvc_test.elf common.o main_tests.o rvc_tests.o rvc_quadrant0.o rvc_quadrant1.o \
-    rvc_quadrant2.o base_tests.o base_loads.o base_stores.o base_lui.o base_auipc.o base_jal.o base_jalr.o base_branches.o
+    rvc_quadrant2.o base_tests.o base_loads.o base_stores.o base_lui.o base_auipc.o base_jal.o base_jalr.o base_branches.o base_op_alu.o
 riscv64-linux-gnu-objcopy -O binary rvc_test.elf rvc_test.bin
 ```
 
@@ -370,7 +385,7 @@ point. To add a new suite (say, the `M` extension):
    `.global run_m_tests`, printing its own banner and calling into one
    or more category files the same way `rvc_tests.S` calls into
    `rvc_quadrant0/1/2.S` or `base_tests.S` calls into `base_loads.S`/
-   `base_stores.S`/`base_lui.S`/`base_auipc.S`/`base_jal.S`/`base_jalr.S`/`base_branches.S`.
+   `base_stores.S`/`base_lui.S`/`base_auipc.S`/`base_jal.S`/`base_jalr.S`/`base_branches.S`/`base_op_alu.S`.
    Use `check`/`uart_puts` from `common.S` the same way the existing
    suites do. Split it into multiple files if it's large enough to
    benefit — each category file should expose exactly one entry symbol
@@ -452,6 +467,7 @@ Additionally, for the base-ISA load suite specifically:
 - `base_jal.S` — the `JAL` test body.
 - `base_jalr.S` — the `JALR` test body.
 - `base_branches.S` — the conditional-branch test bodies.
+- `base_op_alu.S` — the R-type ALU test bodies.
 - `Makefile` — build/run/disasm/clean targets.
 - `rvc_test.bin` — prebuilt flat binary, ready to load at `0x80000000`.
 - `rvc_test.elf` — the linked ELF (handy for `objdump -d` / debugging

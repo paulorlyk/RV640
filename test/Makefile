@@ -37,6 +37,7 @@
 #   base_jal.S        - JAL
 #   base_jalr.S       - JALR
 #   base_branches.S   - BEQ, BNE, BLT, BGE, BLTU, BGEU
+#   base_op_alu.S     - ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
 #
 # Future instruction-set suites (e.g. an "M" extension test) can be
 # added as their own file(s) defining run_yyy_tests, with one new line
@@ -56,7 +57,7 @@ BUILD_DIR   = build
 
 COMMON_SRC  = common.S
 SUITE_SRCS  = main_tests.S rvc_tests.S rvc_quadrant0.S rvc_quadrant1.S rvc_quadrant2.S \
-              base_tests.S base_loads.S base_stores.S base_lui.S base_auipc.S base_jal.S base_jalr.S base_branches.S
+              base_tests.S base_loads.S base_stores.S base_lui.S base_auipc.S base_jal.S base_jalr.S base_branches.S base_op_alu.S
 SUITE_OBJS  = $(addprefix $(BUILD_DIR)/,$(SUITE_SRCS:.S=.o))
 COMMON_OBJ  = $(BUILD_DIR)/common.o
 OUT         = $(BUILD_DIR)/rvc_test

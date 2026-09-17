@@ -39,6 +39,7 @@ run_base_tests:
     jal     ra, tests_base_jal
     jal     ra, tests_base_jalr
     jal     ra, tests_base_branches
+    jal     ra, tests_base_op_alu
 
     ld      ra, 0(sp)
     addi    sp, sp, 16
