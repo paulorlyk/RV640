@@ -13,18 +13,28 @@
 #include <stdio.h>
 #include <ctype.h>
 
-uint16_t _statusLine[80] = {};
+static uint16_t _statusLine[80] = {};
 
-void inline _printStatusLine() {
+static uint16_t _pageStatus = ' ';
+static bool _idle = false;
+
+static void inline _printStatusLine() {
   uint16_t __far *videoMem = __libi86_MK_FP(0xB800, 0);
 
   _fmemcpy(videoMem, _statusLine, sizeof(_statusLine));
 }
 
-void inline _pokeVideoMem(int offset, uint16_t data) {
+static void inline _pokeVideoMem(int offset, uint16_t data) {
   uint16_t __far *videoMem = __libi86_MK_FP(0xB800, 0);
 
   *(videoMem + offset) = data;
+}
+
+static inline void _renderPageStatus() {
+  const uint16_t d = _idle ? ' ' : _pageStatus;
+
+  _statusLine[0] = d;
+  _pokeVideoMem(0, d);
 }
 
 #else
@@ -99,26 +109,32 @@ void ui_time(uint64_t ms) {
 #endif
 }
 
+void ui_idle(bool bIdle) {
+#ifdef CONFIG_DOS
+  _idle = bIdle;
+
+  _renderPageStatus();
+#endif
+}
+
 void ui_page_status(UIPageStatus status) {
 #ifdef CONFIG_DOS
-  uint16_t data;
   switch(status) {
     default:
     case UI_PS_IDLE:
-      data = 2U << 12U | (unsigned int)' ';
+      _pageStatus = 2U << 12U | (unsigned int)' ';
       break;
 
     case UI_PS_RD:
-      data = 1U << 12U | (unsigned int)' ';
+      _pageStatus = 1U << 12U | (unsigned int)' ';
       break;
 
     case UI_PS_WR:
-      data = 4U << 12U | (unsigned int)' ';
+      _pageStatus = 4U << 12U | (unsigned int)' ';
       break;
   }
 
-  _statusLine[0] = data;
-  _pokeVideoMem(0, data);
+  _renderPageStatus();
 #endif
 }
 

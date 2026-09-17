@@ -10,6 +10,8 @@
 
 #define ACLINT_HARTS 1
 
+#define ACLINT_FREQENCY 10000000LU
+
 typedef struct {
   Device dev;
 
@@ -36,5 +38,7 @@ void aclint_destroy(Aclint *self);
 void aclint_tick(Aclint *self, unsigned int cycles);
 
 #define aclint_mtime(self) ((self)->mtimer.mtime)
+
+uint64_t aclint_mtimeRemains(Aclint *self, int hart);
 
 #endif //ACLINT_H_1EB7E96A572247C5ABBBCD05B33CCB6C

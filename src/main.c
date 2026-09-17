@@ -282,6 +282,7 @@ int main(int argc, char* argv[]) {
 
   ui_cps(0);
   ui_time(runtime_ms);
+  ui_idle(false);
 
   for(long int cyclesAcc = 0;;) {
 #ifdef MAX_CYCLES
@@ -293,8 +294,7 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
-    const int cyclesPerStep = 64;
-
+    const int cyclesPerStep = 100;
     for(int i = 0; i < cyclesPerStep; ++i) {
       if(rv64_isWFI(&_vm.cpu))
         break;
@@ -303,6 +303,20 @@ int main(int argc, char* argv[]) {
     }
     aclint_tick(&_vm.aclint, cyclesPerStep);
     cyclesAcc += cyclesPerStep;
+
+    if(rv64_isWFI(&_vm.cpu)) {
+      const uint64_t aclint_usecs = (ACLINT_FREQENCY / 1000000);
+
+      uint64_t mtimeRemains_us = aclint_mtimeRemains(&_vm.aclint, 0) / aclint_usecs;
+      if(mtimeRemains_us > 100000)
+        mtimeRemains_us = 100000;
+
+      ui_idle(true);
+      usleep(mtimeRemains_us);
+      ui_idle(false);
+
+      aclint_tick(&_vm.aclint, mtimeRemains_us * aclint_usecs);
+    }
 
     if(cyclesAcc > 5000) {
       const clock_t now = clock();

@@ -91,3 +91,7 @@ void aclint_tick(Aclint *self, unsigned int cycles) {
 
   _updateMtimer(self);
 }
+
+uint64_t aclint_mtimeRemains(Aclint *self, int hart) {
+  return self->mtimer.mtimecmp[hart] - self->mtimer.mtime;
+}

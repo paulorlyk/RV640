@@ -20,7 +20,7 @@ void ui_rerender();
 
 void ui_cps(uint32_t cps);
 void ui_time(uint64_t ms);
-
+void ui_idle(bool bIdle);
 void ui_page_status(UIPageStatus status);
 
 char ui_getch();
