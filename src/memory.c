@@ -225,6 +225,15 @@ bool mem_init(Memory* self, cpu_size_t size)
     if((n++ % 256) == 0)
       INFO("Mem: Swap size: %ld bytes", swapPos);
   }
+
+  _dosFClose(self->swap);
+  self->swap = _dosFOpen(swapFile);
+  if(self->swap < 0) {
+    ERROR("Failed reopen swap file");
+    mem_destroy(self);
+    return false;
+  }
+
   INFO("Mem: Swap initialized: %ld  bytes", swapPos);
 
   for(int i = 0; i < MEM_PAGES; ++i) {
