@@ -88,10 +88,6 @@ static inline long int _dosFTell(_dosFileHandle file) {
   return (long int)(((unsigned long int)r.x.dx << 16) | (unsigned long int)r.x.ax);
 }
 
-static inline void _dirtyPage(struct _memPage *page) {
-  page->dirty = true;
-}
-
 static inline void _swapLruHead(Memory* self, struct _memPage *page) {
   if(page->prev)
     page->prev->next = page->next;
@@ -106,9 +102,6 @@ static inline void _swapLruHead(Memory* self, struct _memPage *page) {
 }
 
 static inline void _storePage(Memory* self, struct _memPage *page) {
-  if(!page->dirty)
-    return;
-
 #ifdef MEMORY_STATS
   ++self->pageWrites;
 #endif
@@ -122,8 +115,6 @@ static inline void _storePage(Memory* self, struct _memPage *page) {
     ERROR("Mem: Failed to write page to swap");
     return;
   }
-
-  page->dirty = false;
 }
 
 static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _memPage *page) {
@@ -173,8 +164,10 @@ static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr)
 
   _swapLruHead(self, page);
 
-  ui_page_status(UI_PS_WR);
-  _storePage(self, page);
+  if(page->dirty) {
+    ui_page_status(UI_PS_WR);
+    _storePage(self, page);
+  }
 
   ui_page_status(UI_PS_RD);
   _loadPage(self, pageAddr, page);
@@ -319,7 +312,7 @@ void mem_write(Memory *self, cpu_addr_t addr, const void* buf, size_t size) {
 
     _fmemcpy(page->data + pageOffest, (const char *)buf + done, chunkSize);
 
-    _dirtyPage(page);
+    page->dirty = true;
 
     done += chunkSize;
     localAddr += chunkSize;

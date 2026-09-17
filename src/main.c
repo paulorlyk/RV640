@@ -295,12 +295,8 @@ int main(int argc, char* argv[]) {
 #endif
 
     const int cyclesPerStep = 100;
-    for(int i = 0; i < cyclesPerStep; ++i) {
-      if(rv64_isWFI(&_vm.cpu))
-        break;
-
+    for(int i = 0; i < cyclesPerStep; ++i)
       rv64_run(&_vm.cpu);
-    }
     aclint_tick(&_vm.aclint, cyclesPerStep);
     cyclesAcc += cyclesPerStep;
 
