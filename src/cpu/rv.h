@@ -2,10 +2,10 @@
 // Created by palulukan on 7/24/26.
 //
 
-#ifndef RV64_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
-#define RV64_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
+#ifndef RV_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
+#define RV_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
 
-#include "rv64_types.h"
+#include "rv_types.h"
 #include "../bus.h"
 
 #ifndef CONFIG_DOS
@@ -82,28 +82,28 @@ typedef struct {
     uint8_t line[ICACHE_LINE_SIZE];
   } icache;
 
-  RV64_PrivMode mode;
+  RV_PrivMode mode;
 
 #ifdef CPU_STATS
   uint32_t icacheHits;
   uint32_t icacheMisses;
 #endif
-} RV64_Cpu;
+} RV_Cpu;
 
-bool rv64_init(RV64_Cpu* self, Bus *bus);
-void rv64_destroy(RV64_Cpu *self);
+bool rv_init(RV_Cpu* self, Bus *bus);
+void rv_destroy(RV_Cpu *self);
 
-#define rv64_getPC(self) ((self)->PC)
-#define rv64_getRx(self, rx) ((self)->regs.Rx[(rx)])
+#define rv_getPC(self) ((self)->PC)
+#define rv_getRx(self, rx) ((self)->regs.Rx[(rx)])
 
-#define rv64_isWFI(self) ((self)->wfi)
-#define rv64_setRx(self, rx, val) ((self)->regs.Rx[(rx)] = (val))
+#define rv_isWFI(self) (!!((self)->wfi))
+#define rv_setRx(self, rx, val) ((self)->regs.Rx[(rx)] = (val))
 
-void rv64_reset(RV64_Cpu *self, cpu_addr_t start);
+void rv_reset(RV_Cpu *self, cpu_addr_t start);
 
-void rv64_run(RV64_Cpu *self);
+void rv_run(RV_Cpu *self);
 
-void rv64_setInterrupt(RV64_Cpu *self, RV64_MCAUSE n);
-void rv64_clearInterrupt(RV64_Cpu *self, RV64_MCAUSE n);
+void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n);
+void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n);
 
-#endif //RV64_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA
+#endif //RV_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA

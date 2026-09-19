@@ -6,7 +6,7 @@
 #define PLIC_H_E5E4A5FAA02944E8B4BA0095454426CF
 
 #include "device.h"
-#include "../cpu/rv64.h"
+#include "../cpu/rv.h"
 
 #define PLIC_HARTS 1
 
@@ -30,10 +30,10 @@ typedef struct {
     uint32_t pendingClaims[PLIC_INTERRUPT_WORDS];
   } contexts[PLIC_CONTEXTS];
 
-  RV64_Cpu* harts[PLIC_HARTS];
+  RV_Cpu* harts[PLIC_HARTS];
 } Plic;
 
-bool plic_init(Plic* self, RV64_Cpu* harts[PLIC_HARTS]);
+bool plic_init(Plic* self, RV_Cpu* harts[PLIC_HARTS]);
 
 void plic_destroy(Plic *self);
 

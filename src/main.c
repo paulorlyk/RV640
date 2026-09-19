@@ -5,7 +5,7 @@
 
 #include "bus.h"
 #include "memory.h"
-#include "cpu/rv64.h"
+#include "cpu/rv.h"
 #include "dev/ns16550a.h"
 #include "dev/plic.h"
 #include "dev/aclint.h"
@@ -30,7 +30,7 @@ static struct {
 
 static struct {
   Bus bus;
-  RV64_Cpu cpu;
+  RV_Cpu cpu;
   Memory ram;
   Aclint aclint;
   Plic plic;
@@ -198,7 +198,7 @@ static void _usage(const char* exe) {
 }
 
 static void _vmDestroy() {
-  rv64_destroy(&_vm.cpu);
+  rv_destroy(&_vm.cpu);
   bus_destroy(&_vm.bus);
   mem_destroy(&_vm.ram);
   ns16550a_destroy(&_vm.uart0);
@@ -222,12 +222,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(!rv64_init(&_vm.cpu, &_vm.bus)) {
+  if(!rv_init(&_vm.cpu, &_vm.bus)) {
     _vmDestroy();
     return 1;
   }
 
-  static RV64_Cpu *harts[] = { &_vm.cpu };
+  static RV_Cpu *harts[] = { &_vm.cpu };
 
 #ifdef CONFIG_DOS
   if(!mem_init(&_vm.ram, 32LL * 1024 * 1024, _opts.swapFile)) {
@@ -273,9 +273,9 @@ int main(int argc, char* argv[]) {
   }
 
   INFO("Resetting the CPU...");
-  rv64_reset(&_vm.cpu, kernelEntryPoint);
-  rv64_setRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
-  rv64_setRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
+  rv_reset(&_vm.cpu, kernelEntryPoint);
+  rv_setRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
+  rv_setRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
 
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
@@ -296,11 +296,11 @@ int main(int argc, char* argv[]) {
 
     const int cyclesPerStep = 100;
     for(int i = 0; i < cyclesPerStep; ++i)
-      rv64_run(&_vm.cpu);
+      rv_run(&_vm.cpu);
     aclint_tick(&_vm.aclint, cyclesPerStep);
     cyclesAcc += cyclesPerStep;
 
-    if(rv64_isWFI(&_vm.cpu)) {
+    if(rv_isWFI(&_vm.cpu)) {
       const uint64_t aclint_usecs = (ACLINT_FREQENCY / 1000000);
 
       uint64_t mtimeRemains_us = aclint_mtimeRemains(&_vm.aclint, 0) / aclint_usecs;
@@ -335,7 +335,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef MAX_CYCLES
   putc('\n', stderr);
-  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv64_getPC(&_vm.cpu));
+  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv_getPC(&_vm.cpu));
 #endif
 
   _vmDestroy();

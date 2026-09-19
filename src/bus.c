@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 static inline bool _includes(cpu_addr_t base, cpu_size_t size, cpu_addr_t a, cpu_size_t s) {
   return (a >= base) && ((a + (s - 1)) <= (base + size));

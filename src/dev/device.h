@@ -5,7 +5,7 @@
 #ifndef DEVICE_H_2517C9DF583A456F9FFB60DB3E26551A
 #define DEVICE_H_2517C9DF583A456F9FFB60DB3E26551A
 
-#include "../cpu/rv64_types.h"
+#include "../cpu/rv_types.h"
 
 #include <stddef.h>
 #include <stdbool.h>

@@ -2,8 +2,8 @@
 // Created by palulukan on 7/24/26.
 //
 
-#ifndef RV64_TYPES_H_3A55870B9B434441AC8E30E67683E50E
-#define RV64_TYPES_H_3A55870B9B434441AC8E30E67683E50E
+#ifndef RV_TYPES_H_3A55870B9B434441AC8E30E67683E50E
+#define RV_TYPES_H_3A55870B9B434441AC8E30E67683E50E
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -103,7 +103,7 @@ typedef enum {
   CPU_REG_T4 = CPU_REG_X29,   // temporary register 4
   CPU_REG_T5 = CPU_REG_X30,   // temporary register 5
   CPU_REG_T6 = CPU_REG_X31,   // temporary register 6
-} RV64_REG;
+} RV_REG;
 
 typedef enum {
   MCAUSE_SUPERVISOR_SW_INT = 1,   // Supervisor software interrupt
@@ -131,14 +131,14 @@ typedef enum {
   MCAUSE_DOUBLE_TRAP = 16,        // Double trap
   MCAUSE_SW_CHECK = 18,           // Software check
   MCAUSE_HW_ERR = 19,             // Hardware error
-} RV64_MCAUSE;
+} RV_MCAUSE;
 
 typedef enum {
-  RV64_PRIV_MODE_USER = 0,
-  RV64_PRIV_MODE_SUPERVISOR = 1,
-  RV64_PRIV_MODE_RESERVED = 2,
-  RV64_PRIV_MODE_MACHINE = 3,
-} RV64_PrivMode;
+  RV_PRIV_MODE_USER = 0,
+  RV_PRIV_MODE_SUPERVISOR = 1,
+  RV_PRIV_MODE_RESERVED = 2,
+  RV_PRIV_MODE_MACHINE = 3,
+} RV_PrivMode;
 
 #define MIE_RW_MASK  ( \
     (1ULL << (unsigned int)MCAUSE_SUPERVISOR_SW_INT) \
@@ -191,4 +191,4 @@ DEFINE_MIN_FUNC(cpu_addr_t);
 DEFINE_MAX_FUNC(cpu_size_t);
 DEFINE_MIN_FUNC(cpu_size_t);
 
-#endif //RV64_TYPES_H_3A55870B9B434441AC8E30E67683E50E
+#endif //RV_TYPES_H_3A55870B9B434441AC8E30E67683E50E

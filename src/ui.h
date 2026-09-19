@@ -5,7 +5,7 @@
 #ifndef UI_H_E33E09B534A44C759DC58A0B98093190
 #define UI_H_E33E09B534A44C759DC58A0B98093190
 
-#include "cpu/rv64.h"
+#include "cpu/rv.h"
 
 typedef enum {
   UI_PS_IDLE,

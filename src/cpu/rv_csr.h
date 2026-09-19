@@ -5,13 +5,13 @@
 #ifndef RV_CSR_H_D4C96AF09E5C4CCA803F631D77C3F3ED
 #define RV_CSR_H_D4C96AF09E5C4CCA803F631D77C3F3ED
 
-#include "rv64.h"
+#include "rv.h"
 
 #include "../log.h"
 
 #include <assert.h>
 
-static inline cpu_word_t _readCSR(RV64_Cpu *self, uint16_t csr) {
+static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
   // Reading CSRs can have side effects
   if(self->trap)
     return 0;
@@ -73,7 +73,7 @@ static inline cpu_word_t _readCSR(RV64_Cpu *self, uint16_t csr) {
   return 0;
 }
 
-static inline void _writeCSR(RV64_Cpu *self, uint16_t csr, cpu_word_t val) {
+static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
   if(self->trap)
     return;
 

@@ -27,16 +27,16 @@ static void _processInterrupts(Plic *self) {
 
   for(int i = 0; i < PLIC_CONTEXTS; ++i) {
     const int hart = i / PLIC_CONTEXTS_PER_HART;
-    const RV64_MCAUSE cause = i % PLIC_CONTEXTS_PER_HART ? MCAUSE_SUPERVISOR_EXT_INT : MCAUSE_MACHINE_EXT_INT;
+    const RV_MCAUSE cause = i % PLIC_CONTEXTS_PER_HART ? MCAUSE_SUPERVISOR_EXT_INT : MCAUSE_MACHINE_EXT_INT;
 
     if(priority > self->contexts[i].threshold && (self->contexts[i].pendingClaims[irqWord] & irqMask) == 0 && self->contexts[i].enable[irqWord] & irqMask) {
       self->contexts[i].claim = irq;
 
-      rv64_setInterrupt(self->harts[hart], cause);
+      rv_setInterrupt(self->harts[hart], cause);
     } else {
       self->contexts[i].claim = 0;
 
-      rv64_clearInterrupt(self->harts[hart], cause);
+      rv_clearInterrupt(self->harts[hart], cause);
     }
   }
 }
@@ -153,7 +153,7 @@ static void _cbWrite(void *opaque, cpu_addr_t addr, const void* buf, size_t size
   _completeInterrupts(self, completeContext, completeIrq);
 }
 
-bool plic_init(Plic *self, RV64_Cpu* harts[PLIC_HARTS]) {
+bool plic_init(Plic *self, RV_Cpu* harts[PLIC_HARTS]) {
   memset(self, 0, sizeof(*self));
 
   for(int i = 0; i < PLIC_HARTS; ++i)

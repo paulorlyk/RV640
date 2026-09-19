@@ -5,7 +5,7 @@
 #ifndef RV_INSTR_H_9AD35DA2EE06480DBD9A36468FBB44AD
 #define RV_INSTR_H_9AD35DA2EE06480DBD9A36468FBB44AD
 
-#include "rv64.h"
+#include "rv.h"
 
 #include "rv_internal.h"
 #include "rv_csr.h"
@@ -31,7 +31,7 @@ struct _instr {
   uint32_t simm;
 };
 
-static inline void _doILL(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doILL(RV_Cpu* self, const struct _instr *di) {
   (void)di;
 
   _trap(self, MCAUSE_INST_ILL, false);
@@ -40,7 +40,7 @@ static inline void _doILL(RV64_Cpu* self, const struct _instr *di) {
   assert(false);
 }
 
-static inline void _doJAL(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doJAL(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->jimm, 20, cpu_word_t);
   const cpu_addr_t pc = _readPC(self);
   const cpu_word_t target = pc + imm;
@@ -49,18 +49,18 @@ static inline void _doJAL(RV64_Cpu* self, const struct _instr *di) {
   _writePC(self, target - di->size);
 }
 
-static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
     case 0: {
       switch(di->iimm) {
         case 0: {
           // ECALL
-          RV64_MCAUSE cause;
+          RV_MCAUSE cause;
           switch(self->mode) {
             default:
-            case RV64_PRIV_MODE_USER: cause = MCAUSE_CALL_U; break;
-            case RV64_PRIV_MODE_SUPERVISOR: cause = MCAUSE_CALL_S; break;
-            case RV64_PRIV_MODE_MACHINE: cause = MCAUSE_CALL_M; break;
+            case RV_PRIV_MODE_USER: cause = MCAUSE_CALL_U; break;
+            case RV_PRIV_MODE_SUPERVISOR: cause = MCAUSE_CALL_S; break;
+            case RV_PRIV_MODE_MACHINE: cause = MCAUSE_CALL_M; break;
           }
 
           self->mtval = 0;
@@ -87,7 +87,7 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
           self->mstatus = (self->mstatus & ~MSTATUS_MIE_MASK) | ((self->mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0);
           // Restore privilege mode
           self->mode = (self->mstatus >> 11) & 3;
-          self->mstatus = (self->mstatus & ~MSTATUS_MPP_MASK) | ((cpu_word_t)RV64_PRIV_MODE_USER << 11);
+          self->mstatus = (self->mstatus & ~MSTATUS_MPP_MASK) | ((cpu_word_t)RV_PRIV_MODE_USER << 11);
           _writePC(self, self->mepc - di->size);
           break;
         }
@@ -160,7 +160,7 @@ static inline void _doSYSTEM(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
     case 1: {
       if(!di->iimm && !di->rs1 && !di->rd) {
@@ -201,7 +201,7 @@ static inline void _doMISCMEM(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doOPIMM(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doOPIMM(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
   const cpu_word_t rs1 = _readReg(self, di->rs1);
 
@@ -259,7 +259,7 @@ static inline void _doOPIMM(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doBRANCH(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doBRANCH(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->bimm, 12, cpu_word_t);
   const cpu_word_t rs1 = _readReg(self, di->rs1);
   const cpu_word_t rs2 = _readReg(self, di->rs2);
@@ -314,13 +314,13 @@ static inline void _doBRANCH(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doLUI(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doLUI(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->uimm, 31, cpu_word_t);
 
   _writeReg(self, di->rd, imm);
 }
 
-static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t rs1 = _readReg(self, di->rs1);
   const cpu_word_t rs2 = _readReg(self, di->rs2);
 
@@ -538,7 +538,7 @@ static inline void _doOP(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doJALR(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doJALR(RV_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
     case 0: {
       // JALR
@@ -557,13 +557,13 @@ static inline void _doJALR(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doAUIPC(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doAUIPC(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->uimm, 31, cpu_word_t);
 
   _writeReg(self, di->rd, _readPC(self) + imm);
 }
 
-static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doOPIMM32(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t imm = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
   const uint32_t rs1 = _readReg(self, di->rs1);
 
@@ -620,7 +620,7 @@ static inline void _doOPIMM32(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
   if(size != 4 && size != 8) {
     _doILL(self, di);
@@ -715,7 +715,7 @@ static inline void _doAMO(RV64_Cpu* self, const struct _instr *di) {
     _writeMem(self, rs1, &data, size);
 }
 
-static inline void _doSTORE(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doSTORE(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
   if(size > 8) {
     _doILL(self, di);
@@ -729,7 +729,7 @@ static inline void _doSTORE(RV64_Cpu* self, const struct _instr *di) {
   _writeMem(self, addr, &data, size);
 }
 
-static inline void _doLOAD(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doLOAD(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << (di->funct3 & 3U);
   const bool isSigned = !(di->funct3 & 4U);
 
@@ -744,7 +744,7 @@ static inline void _doLOAD(RV64_Cpu* self, const struct _instr *di) {
   _writeReg(self, di->rd, data);
 }
 
-static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
+static inline void _doOP32(RV_Cpu* self, const struct _instr *di) {
   const uint32_t rs1 = _readReg(self, di->rs1);
   const uint32_t rs2 = _readReg(self, di->rs2);
 
@@ -884,7 +884,7 @@ static inline void _doOP32(RV64_Cpu* self, const struct _instr *di) {
   }
 }
 
-static inline void _execInstr(RV64_Cpu* self, uint32_t instr) {
+static inline void _execInstr(RV_Cpu* self, uint32_t instr) {
   struct _instr di;
   di.size = 4;
 

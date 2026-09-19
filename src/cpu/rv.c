@@ -2,7 +2,7 @@
 // Created by palulukan on 7/24/26.
 //
 
-#include "rv64.h"
+#include "rv.h"
 
 #include "../log.h"
 
@@ -13,7 +13,7 @@
 #include <string.h>
 #include <assert.h>
 
-static inline void _processPendingInterrupts(RV64_Cpu *self) {
+static inline void _processPendingInterrupts(RV_Cpu *self) {
   static const unsigned int vectors[] = {
     MCAUSE_MACHINE_EXT_INT,
     MCAUSE_MACHINE_SW_INT,
@@ -39,7 +39,7 @@ static inline void _processPendingInterrupts(RV64_Cpu *self) {
   }
 }
 
-static inline uint32_t _fetch(RV64_Cpu *self) {
+static inline uint32_t _fetch(RV_Cpu *self) {
   const cpu_word_t pc = _readPC(self);
 
   if(pc & 1) {
@@ -79,7 +79,7 @@ static inline uint32_t _fetch(RV64_Cpu *self) {
   return res;
 }
 
-static inline void _doTrap(RV64_Cpu* self) {
+static inline void _doTrap(RV_Cpu* self) {
   self->trap = false;
   self->wfi = false;
 
@@ -90,7 +90,7 @@ static inline void _doTrap(RV64_Cpu* self) {
     if(mode == 1)
       vec += 4 * (self->mcause & ~CPU_SIGN_BIT);
   } else {
-    // DEBUG("RV64: Executing trap @%" PRI_CPU_PTR " -> %" PRI_CPU_PTR " cause: %" PRI_CPU_XWORD, _readPC(self), vec, self->mcause);
+    // DEBUG("RV: Executing trap @%" PRI_CPU_PTR " -> %" PRI_CPU_PTR " cause: %" PRI_CPU_XWORD, _readPC(self), vec, self->mcause);
   }
 
   // Copy MIE -> MPIE and clear MIE
@@ -99,14 +99,14 @@ static inline void _doTrap(RV64_Cpu* self) {
   // Save privilege mode
   self->mstatus = (self->mstatus & ~MSTATUS_MPP_MASK) | (cpu_word_t)self->mode << 11;
 
-  self->mode = RV64_PRIV_MODE_MACHINE;
+  self->mode = RV_PRIV_MODE_MACHINE;
 
   self->mepc = self->PC;
 
   _writePC(self, vec);
 }
 
-bool rv64_init(RV64_Cpu* self, Bus *bus) {
+bool rv_init(RV_Cpu* self, Bus *bus) {
   memset(self, 0, sizeof(*self));
 
   self->bus = bus;
@@ -114,7 +114,7 @@ bool rv64_init(RV64_Cpu* self, Bus *bus) {
   return true;
 }
 
-void rv64_destroy(RV64_Cpu *self) {
+void rv_destroy(RV_Cpu *self) {
   (void)self;
 
 #ifdef CPU_STATS
@@ -123,7 +123,7 @@ void rv64_destroy(RV64_Cpu *self) {
 #endif
 }
 
-void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {
+void rv_reset(RV_Cpu *self, cpu_addr_t start) {
   _flushIcache(self);
 
   bus_reservationCheckInvalidate(self->bus, 0, 0);
@@ -136,12 +136,12 @@ void rv64_reset(RV64_Cpu *self, cpu_addr_t start) {
 
   self->trap = false;
 
-  self->mode = RV64_PRIV_MODE_MACHINE;
+  self->mode = RV_PRIV_MODE_MACHINE;
 
   _writePC(self, start);
 }
 
-void rv64_run(RV64_Cpu *self) {
+void rv_run(RV_Cpu *self) {
   if(self->trap) {
     _doTrap(self);
   } else if(self->irq) {
@@ -163,7 +163,7 @@ void rv64_run(RV64_Cpu *self) {
   _writePC(self, _readPC(self) + instrSize);
 }
 
-void rv64_setInterrupt(RV64_Cpu *self, RV64_MCAUSE n) {
+void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n) {
   const cpu_word_t mask = (cpu_word_t)1 << n;
 
   self->mip |= mask;
@@ -172,6 +172,6 @@ void rv64_setInterrupt(RV64_Cpu *self, RV64_MCAUSE n) {
   self->wfi = false;
 }
 
-void rv64_clearInterrupt(RV64_Cpu *self, RV64_MCAUSE n) {
+void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n) {
   self->mip &= ~((cpu_word_t)1 << n);
 }

@@ -11,12 +11,12 @@ static void _updateMtimer(Aclint *self) {
     if(self->mtimer.mtime >= self->mtimer.mtimecmp[i]) {
       if(!self->mtimer.pindingIrq[i]) {
         self->mtimer.pindingIrq[i] = true;
-        rv64_setInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
+        rv_setInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
       }
     } else {
       if(self->mtimer.pindingIrq[i]) {
         self->mtimer.pindingIrq[i] = false;
-        rv64_clearInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
+        rv_clearInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
       }
     }
   }
@@ -25,9 +25,9 @@ static void _updateMtimer(Aclint *self) {
 static void _updateMswi(const Aclint *self) {
   for(int i = 0; i < ACLINT_HARTS; ++i) {
     if(self->mswi.msip[i])
-      rv64_setInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
+      rv_setInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
     else
-      rv64_clearInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
+      rv_clearInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
   }
 }
 
@@ -68,7 +68,7 @@ static void _cbWrite(void *opaque, cpu_addr_t addr, const void* buf, size_t size
   _updateMswi(self);
 }
 
-bool aclint_init(Aclint *self, RV64_Cpu* harts[ACLINT_HARTS]) {
+bool aclint_init(Aclint *self, RV_Cpu* harts[ACLINT_HARTS]) {
   memset(self, 0, sizeof(*self));
 
   for(int i = 0; i < ACLINT_HARTS; ++i)

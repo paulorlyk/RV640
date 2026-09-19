@@ -6,7 +6,7 @@
 #define ACLINT_H_1EB7E96A572247C5ABBBCD05B33CCB6C
 
 #include "device.h"
-#include "../cpu/rv64.h"
+#include "../cpu/rv.h"
 
 #define ACLINT_HARTS 1
 
@@ -26,10 +26,10 @@ typedef struct {
     bool pindingIrq[ACLINT_HARTS];
   } mtimer;
 
-  RV64_Cpu* harts[ACLINT_HARTS];
+  RV_Cpu* harts[ACLINT_HARTS];
 } Aclint;
 
-bool aclint_init(Aclint* self, RV64_Cpu* harts[ACLINT_HARTS]);
+bool aclint_init(Aclint* self, RV_Cpu* harts[ACLINT_HARTS]);
 
 void aclint_destroy(Aclint *self);
 
