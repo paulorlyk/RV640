@@ -722,8 +722,8 @@ static inline void _doSTORE(RV_Cpu* self, const struct _instr *di) {
     return;
   }
 
-  const cpu_word_t offset = SIGN_EXTEND(di->simm, 11, cpu_word_t);
-  const cpu_word_t addr = _readReg(self, di->rs1) + offset;
+  const cpu_addr_t offset = SIGN_EXTEND(di->simm, 11, cpu_addr_t);
+  const cpu_addr_t addr = _readReg(self, di->rs1) + offset;
 
   const cpu_word_t data = _readReg(self, di->rs2);
   _writeMem(self, addr, &data, size);
@@ -733,8 +733,8 @@ static inline void _doLOAD(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << (di->funct3 & 3U);
   const bool isSigned = !(di->funct3 & 4U);
 
-  const cpu_word_t offset = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
-  const cpu_word_t addr = _readReg(self, di->rs1) + offset;
+  const cpu_addr_t offset = SIGN_EXTEND(di->iimm, 11, cpu_addr_t);
+  const cpu_addr_t addr = _readReg(self, di->rs1) + offset;
 
   cpu_word_t data = 0;
   _readMem(self, addr, &data, size);
