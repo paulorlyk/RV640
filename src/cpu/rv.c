@@ -40,7 +40,7 @@ static inline void _processPendingInterrupts(RV_Cpu *self) {
 }
 
 static inline uint32_t _fetch(RV_Cpu *self) {
-  const cpu_word_t pc = _readPC(self);
+  const cpu_addr_t pc = _readPC(self);
 
   if(pc & 1) {
     _trap(self, MCAUSE_INST_ALLIGN, false);
