@@ -384,8 +384,8 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
           if (((cpu_sword_t)rs1 < 0) != ((cpu_sword_t)rs2 < 0))
             hi = ~hi + (lo == 0);
 #else
-          const int64_t p = (int64_t)rs1 * (int64_t)rs2;
-          const uint32_t hi = (uint64_t)p >> 32;
+          const uint64_t p = (int64_t)((int32_t)rs1) * (int64_t)((int32_t)rs2);
+          const uint32_t hi = p >> 32;
 #endif
           _writeReg(self, di->rd, hi);
           break;
@@ -403,6 +403,41 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
       switch(di->funct7) {
         // SLT
         case 0: _writeReg(self, di->rd, (cpu_sword_t)rs1 < (cpu_sword_t)rs2); break;
+
+        case 1: {
+          // MULHSU
+#ifdef CONFIG_RV64
+          // Ai generated :-)
+          const uint64_t ua = rs1;
+          const uint64_t ub = rs2;
+
+          const uint64_t ma = ((cpu_sword_t)rs1 < 0) ? (0 - ua) : ua;
+          const uint64_t mb = ub;
+
+          const uint64_t a0 = (uint32_t)ma;
+          const uint64_t a1 = ma >> 32;
+          const uint64_t b0 = (uint32_t)mb;
+          const uint64_t b1 = mb >> 32;
+
+          const uint64_t p0 = a0 * b0;
+          const uint64_t p1 = a0 * b1;
+          const uint64_t p2 = a1 * b0;
+          const uint64_t p3 = a1 * b1;
+
+          const uint64_t mid = (p0 >> 32) + (uint32_t)p1 + (uint32_t)p2;
+
+          const uint64_t lo = (p0 & UINT64_C(0xffffffff)) | (mid << 32);
+          uint64_t hi = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+
+          if ((cpu_sword_t)rs1 < 0)
+            hi = ~hi + (lo == 0);
+#else
+          const uint64_t p = (int64_t)((int32_t)rs1) * (uint64_t)rs2;
+          const uint32_t hi = p >> 32;
+#endif
+          _writeReg(self, di->rd, hi);
+          break;
+        }
 
         default: {
           _doILL(self, di);
