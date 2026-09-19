@@ -10,6 +10,8 @@
 
 #include "../utils.h"
 
+#ifdef CONFIG_RV64
+
 typedef uint64_t cpu_word_t;
 typedef int64_t  cpu_sword_t;
 
@@ -21,10 +23,6 @@ typedef uint64_t cpu_addr_t;
 typedef uint64_t cpu_size_t;
 #endif
 
-#define CPU_SIGN_BIT ((cpu_word_t)1 << ((sizeof(cpu_word_t) * 8) - 1))
-#define CPU_UINT_MAX (~(cpu_word_t)0)
-#define CPU_ADDR_MAX (~(cpu_addr_t)0)
-
 #ifdef CONFIG_RV64_32BIT_ADDR
 #define PRI_CPU_PTR PRIx32
 #define PRI_CPU_SIZE PRIu32
@@ -35,6 +33,28 @@ typedef uint64_t cpu_size_t;
 
 #define PRI_CPU_XWORD PRIx64
 #define PRI_CPU_UWORD PRIu64
+
+#else
+
+typedef uint32_t cpu_word_t;
+typedef int32_t  cpu_sword_t;
+
+typedef uint32_t cpu_addr_t;
+typedef uint32_t cpu_size_t;
+
+#define PRI_CPU_PTR PRIx32
+#define PRI_CPU_SIZE PRIu32
+
+#define PRI_CPU_XWORD PRIx32
+#define PRI_CPU_UWORD PRIu32
+
+#endif
+
+#define CPU_SIGN_BIT ((cpu_word_t)1 << ((sizeof(cpu_word_t) * 8) - 1))
+#define CPU_UINT_MAX (~(cpu_word_t)0)
+#define CPU_ADDR_MAX (~(cpu_addr_t)0)
+
+#define CPU_SHIFT_MASK ((sizeof(cpu_word_t) * 8) - 1)
 
 typedef enum {
   CPU_REG_X0 = 0,
@@ -141,17 +161,23 @@ typedef enum {
 } RV_PrivMode;
 
 #define MIE_RW_MASK  ( \
-    (1ULL << (unsigned int)MCAUSE_SUPERVISOR_SW_INT) \
-  | (1ULL << (unsigned int)MCAUSE_MACHINE_SW_INT) \
-  | (1ULL << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT) \
-  | (1ULL << (unsigned int)MCAUSE_MACHINE_TMR_INT) \
-  | (1ULL << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT) \
-  | (1ULL << (unsigned int)MCAUSE_MACHINE_EXT_INT) \
-  | (1ULL << (unsigned int)MCAUSE_CTR_OVF_INT) \
+    (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_SW_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_MACHINE_SW_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_TMR_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_MACHINE_TMR_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_EXT_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_MACHINE_EXT_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_CTR_OVF_INT) \
   | (~(cpu_word_t)0xFFFF) \
   )
 
-#define MIP_RW_MASK  ((1ULL << (unsigned int)MCAUSE_SUPERVISOR_SW_INT) | (1ULL << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT) | (1ULL << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT))
+#define MIP_RW_MASK  ( \
+    (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_SW_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_TMR_INT) \
+  | (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_EXT_INT) \
+  )
+
+#ifdef CONFIG_RV64
 
 #define MSTATUS_WPRI_MASK ((1ULL << 0) | (1ULL << 2) | (1ULL << 4) | (0x7FULL << 25) | (1ULL << 40) | (0x1FULL << 43) | (0x7FFFULL << 48))
 #define MSTATUS_UBE_MASK  (1ULL << 6)                   // User-mode endianness
@@ -184,6 +210,39 @@ typedef enum {
 #define MSTATUS_TSR_MASK  (1ULL << 22)                  // Trap SRET
 
 #define MSTATUS_WR_VAL(val) (((val) & ~(MSTATUS_WPRI_MASK | MSTATUS_UBE_MASK | MSTATUS_SBE_MASK | MSTATUS_MBE_MASK | MSTATUS_VS_MASK | MSTATUS_FS_MASK | MSTATUS_XS_MASK | MSTATUS_SD_MASK | MSTATUS_UXL_MASK | MSTATUS_SXL_MASK)) | MSTATUS_UXL_64 | MSTATUS_SXL_64)
+
+#else
+#define MSTATUS_WPRI_MASK ((1UL << 0) | (1UL << 2) | (1UL << 4) | (0x3FUL << 25))
+#define MSTATUS_UBE_MASK  (1UL << 6)                   // User-mode endianness
+
+#define MSTATUS_VS_MASK   ((1UL << 9) | (1UL << 10))    // Vector extension state
+#define MSTATUS_FS_MASK   ((1UL << 13) | (1UL << 14))   // Floating-point state
+#define MSTATUS_XS_MASK   ((1UL << 15) | (1UL << 16))   // Additional extension state
+#define MSTATUS_SD_MASK   (1UL << 31)                   // State Dirty summary bit
+
+#define MSTATUS_SIE_MASK  (1UL << 1)                    // Supervisor Interrupt Enable
+#define MSTATUS_MIE_MASK  (1UL << 3)                    // Machine Interrupt Enable
+#define MSTATUS_SPIE_MASK (1UL << 5)                    // Supervisor Previous Interrupt Enable
+#define MSTATUS_MPIE_MASK (1UL << 7)                    // Machine Previous Interrupt Enable
+#define MSTATUS_SPP_MASK  (1UL << 8)                    // Previous supervisor privilege
+#define MSTATUS_MPP_MASK  ((1UL << 11) | (1UL << 12))   // Previous machine privilege
+#define MSTATUS_MPRV_MASK (1UL << 17)                   // Modify PRiVilege
+#define MSTATUS_SUM_MASK  (1UL << 18)                   // Supervisor User Memory access
+#define MSTATUS_MXR_MASK  (1UL << 19)                   // Make eXecutable Readable
+#define MSTATUS_TVM_MASK  (1UL << 20)                   // Trap Virtual Memory
+#define MSTATUS_TW_MASK   (1UL << 21)                   // Timeout Wait
+#define MSTATUS_TSR_MASK  (1UL << 22)                   // Trap SRET
+
+#define MSTATUS_WR_VAL(val) ((val) & ~(MSTATUS_WPRI_MASK | MSTATUS_UBE_MASK | MSTATUS_VS_MASK | MSTATUS_FS_MASK | MSTATUS_XS_MASK | MSTATUS_SD_MASK))
+
+#define MSTATUSH_WPRI_MASK ((0xFUL << 0) | (1UL << 8) | (0x1FUL << 11) | (0xFFFFUL << 16))
+
+#define MSTATUSH_SBE_MASK  (1UL << 4)                   // Supervisor-mode endianness
+#define MSTATUSH_MBE_MASK  (1UL << 5)                   // Machine-mode endianness
+
+#define MSTATUSH_WR_VAL(val) ((val) & ~(MSTATUSH_WPRI_MASK | MSTATUSH_SBE_MASK | MSTATUSH_MBE_MASK))
+
+#endif
 
 DEFINE_MAX_FUNC(cpu_addr_t);
 DEFINE_MIN_FUNC(cpu_addr_t);

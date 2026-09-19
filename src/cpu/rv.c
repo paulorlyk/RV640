@@ -24,10 +24,10 @@ static inline void _processPendingInterrupts(RV_Cpu *self) {
     // MCAUSE_CTR_OVF_INT,
   };
 
-  if(!(self->mstatus & MSTATUS_MIE_MASK))
+  if(!(self->csr.mstatus & MSTATUS_MIE_MASK))
     return;
 
-  const cpu_word_t interrupts = self->mip & self->mie;
+  const cpu_word_t interrupts = self->csr.mip & self->csr.mie;
   if(interrupts) {
     for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
       const cpu_word_t mask = 1ULL << vectors[i];
@@ -83,25 +83,25 @@ static inline void _doTrap(RV_Cpu* self) {
   self->trap = false;
   self->wfi = false;
 
-  cpu_word_t vec = self->mtvec & ~(cpu_word_t)3;
-  if(self->mcause & CPU_SIGN_BIT) {
+  cpu_word_t vec = self->csr.mtvec & ~(cpu_word_t)3;
+  if(self->csr.mcause & CPU_SIGN_BIT) {
     // Interrupt
-    const cpu_word_t mode = self->mtvec & 3;
+    const cpu_word_t mode = self->csr.mtvec & 3;
     if(mode == 1)
-      vec += 4 * (self->mcause & ~CPU_SIGN_BIT);
+      vec += 4 * (self->csr.mcause & ~CPU_SIGN_BIT);
   } else {
     // DEBUG("RV: Executing trap @%" PRI_CPU_PTR " -> %" PRI_CPU_PTR " cause: %" PRI_CPU_XWORD, _readPC(self), vec, self->mcause);
   }
 
   // Copy MIE -> MPIE and clear MIE
-  self->mstatus = (self->mstatus & ~(MSTATUS_MPIE_MASK | MSTATUS_MIE_MASK)) | ((self->mstatus & MSTATUS_MIE_MASK) ? MSTATUS_MPIE_MASK : 0);
+  self->csr.mstatus = (self->csr.mstatus & ~(MSTATUS_MPIE_MASK | MSTATUS_MIE_MASK)) | ((self->csr.mstatus & MSTATUS_MIE_MASK) ? MSTATUS_MPIE_MASK : 0);
 
   // Save privilege mode
-  self->mstatus = (self->mstatus & ~MSTATUS_MPP_MASK) | (cpu_word_t)self->mode << 11;
+  self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | (cpu_word_t)self->mode << 11;
 
   self->mode = RV_PRIV_MODE_MACHINE;
 
-  self->mepc = self->PC;
+  self->csr.mepc = self->PC;
 
   _writePC(self, vec);
 }
@@ -130,7 +130,10 @@ void rv_reset(RV_Cpu *self, cpu_addr_t start) {
 
   self->wfi = false;
 
-  self->mstatus = MSTATUS_WR_VAL(0U);
+  self->csr.mstatus = MSTATUS_WR_VAL(0U);
+#ifndef CONFIG_RV64
+  self->csr.mstatush = MSTATUSH_WR_VAL(0U);
+#endif
 
   self->irq = false;
 
@@ -166,12 +169,12 @@ void rv_run(RV_Cpu *self) {
 void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n) {
   const cpu_word_t mask = (cpu_word_t)1 << n;
 
-  self->mip |= mask;
+  self->csr.mip |= mask;
 
   self->irq = true;
   self->wfi = false;
 }
 
 void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n) {
-  self->mip &= ~((cpu_word_t)1 << n);
+  self->csr.mip &= ~((cpu_word_t)1 << n);
 }

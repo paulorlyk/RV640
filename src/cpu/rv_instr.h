@@ -63,14 +63,14 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
             case RV_PRIV_MODE_MACHINE: cause = MCAUSE_CALL_M; break;
           }
 
-          self->mtval = 0;
+          self->csr.mtval = 0;
           _trap(self, cause, false);
           break;
         }
 
         case 1: {
           // EBREAK
-          self->mtval = 0;
+          self->csr.mtval = 0;
           _trap(self, MCAUSE_BREAKPOINT, false);
           break;
         }
@@ -84,11 +84,11 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
         case 0x302: {
           // MRET
           // Restore MIE
-          self->mstatus = (self->mstatus & ~MSTATUS_MIE_MASK) | ((self->mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0);
+          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MIE_MASK) | ((self->csr.mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0);
           // Restore privilege mode
-          self->mode = (self->mstatus >> 11) & 3;
-          self->mstatus = (self->mstatus & ~MSTATUS_MPP_MASK) | ((cpu_word_t)RV_PRIV_MODE_USER << 11);
-          _writePC(self, self->mepc - di->size);
+          self->mode = (self->csr.mstatus >> 11) & 3;
+          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | ((cpu_word_t)RV_PRIV_MODE_USER << 11);
+          _writePC(self, self->csr.mepc - di->size);
           break;
         }
 
@@ -206,17 +206,19 @@ static inline void _doOPIMM(RV_Cpu* self, const struct _instr *di) {
   const cpu_word_t rs1 = _readReg(self, di->rs1);
 
   switch(di->funct3) {
-    // ADDI
     default:
+    // ADDI
     case 0: _writeReg(self, di->rd, imm + rs1); break;
 
     case 1: {
-      const cpu_word_t f = di->iimm >> 6;
-      if(f == 0) {
+      switch(di->iimm >> 6) {
         // SLLI
-        _writeReg(self, di->rd, rs1 << (di->iimm & 0x3F));
-      } else {
-        _doILL(self, di);
+        case 0: _writeReg(self, di->rd, rs1 << (di->iimm & CPU_SHIFT_MASK)); break;
+
+        default: {
+          _doILL(self, di);
+          break;
+        }
       }
       break;
     }
@@ -231,7 +233,7 @@ static inline void _doOPIMM(RV_Cpu* self, const struct _instr *di) {
     case 4: _writeReg(self, di->rd, rs1 ^ imm); break;
 
     case 5: {
-      const unsigned int shift = di->iimm & 0x3F;
+      const unsigned int shift = di->iimm & CPU_SHIFT_MASK;
       switch(di->iimm >> 6) {
         // SRLI
         case 0: _writeReg(self, di->rd, rs1 >> shift); break;
@@ -315,7 +317,11 @@ static inline void _doBRANCH(RV_Cpu* self, const struct _instr *di) {
 }
 
 static inline void _doLUI(RV_Cpu* self, const struct _instr *di) {
+#ifdef CONFIG_RV64
   const cpu_word_t imm = SIGN_EXTEND(di->uimm, 31, cpu_word_t);
+#else
+  const cpu_word_t imm = di->uimm;
+#endif
 
   _writeReg(self, di->rd, imm);
 }
@@ -348,10 +354,11 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
     case 1: {
       switch(di->funct7) {
         // SLL
-        case 0: _writeReg(self, di->rd, rs1 << (rs2 & 0x3F)); break;
+        case 0: _writeReg(self, di->rd, rs1 << (rs2 & CPU_SHIFT_MASK)); break;
 
-        // MULH
         case 1: {
+          // MULH
+#ifdef CONFIG_RV64
           // Ai generated :-)
           const uint64_t ua = rs1;
           const uint64_t ub = rs2;
@@ -376,7 +383,10 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
 
           if (((cpu_sword_t)rs1 < 0) != ((cpu_sword_t)rs2 < 0))
             hi = ~hi + (lo == 0);
-
+#else
+          const int64_t p = (int64_t)rs1 * (int64_t)rs2;
+          const uint32_t hi = (uint64_t)p >> 32;
+#endif
           _writeReg(self, di->rd, hi);
           break;
         }
@@ -390,11 +400,14 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
     }
 
     case 2: {
-      if(di->funct7 == 0) {
+      switch(di->funct7) {
         // SLT
-        _writeReg(self, di->rd, (cpu_sword_t)rs1 < (cpu_sword_t)rs2);
-      } else {
-        _doILL(self, di);
+        case 0: _writeReg(self, di->rd, (cpu_sword_t)rs1 < (cpu_sword_t)rs2); break;
+
+        default: {
+          _doILL(self, di);
+          break;
+        }
       }
       break;
     }
@@ -404,8 +417,9 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
         // SLTU
         case 0: _writeReg(self, di->rd, rs1 < rs2); break;
 
-        // MULHU
         case 1: {
+          // MULHU
+#ifdef CONFIG_RV64
           // Ai generated :-)
           const uint64_t rs1L = (uint32_t)rs1;
           const uint64_t rs1H = rs1 >> 32;
@@ -419,7 +433,10 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
 
           const uint64_t carry = (p0 >> 32) + (uint32_t)p1 + (uint32_t)p2;
           const uint64_t res = p3 + (p1 >> 32) + (p2 >> 32) + (carry >> 32);
-
+#else
+          const uint64_t p = (uint64_t)rs1 * (uint64_t)rs2;
+          const uint32_t res = p >> 32;
+#endif
           _writeReg(self, di->rd, res);
           break;
         }
@@ -461,7 +478,7 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
     case 5: {
       switch(di->funct7) {
         // SRL
-        case 0: _writeReg(self, di->rd, rs1 >> (rs2 & 0x3F)); break;
+        case 0: _writeReg(self, di->rd, rs1 >> (rs2 & CPU_SHIFT_MASK)); break;
 
         case 1: {
           // DIVU
@@ -474,7 +491,7 @@ static inline void _doOP(RV_Cpu* self, const struct _instr *di) {
 
         case 32: {
           // SRA
-          const unsigned int shift = rs2 & 0x3F;
+          const unsigned int shift = rs2 & CPU_SHIFT_MASK;
           const cpu_word_t sign = ~(((rs1 & CPU_SIGN_BIT) >> shift) - 1);
           _writeReg(self, di->rd, (rs1 >> shift) | sign);
           break;
@@ -558,71 +575,22 @@ static inline void _doJALR(RV_Cpu* self, const struct _instr *di) {
 }
 
 static inline void _doAUIPC(RV_Cpu* self, const struct _instr *di) {
+#ifdef CONFIG_RV64
   const cpu_word_t imm = SIGN_EXTEND(di->uimm, 31, cpu_word_t);
+#else
+  const cpu_word_t imm = di->uimm;
+#endif
 
   _writeReg(self, di->rd, _readPC(self) + imm);
 }
 
-static inline void _doOPIMM32(RV_Cpu* self, const struct _instr *di) {
-  const cpu_word_t imm = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
-  const uint32_t rs1 = _readReg(self, di->rs1);
-
-  switch(di->funct3) {
-    // ADDIW
-    case 0: {
-      const uint32_t res = imm + rs1;
-      _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
-      break;
-    }
-
-    case 1: {
-      const cpu_word_t f = di->iimm >> 5;
-      if(f == 0) {
-        // SLLIW
-        const uint32_t res = rs1 << (di->iimm & 0x1F);
-        _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
-      } else {
-        _doILL(self, di);
-      }
-      break;
-    }
-
-    case 5: {
-      const unsigned int shift = di->iimm & 0x1F;
-      switch(di->iimm >> 5) {
-        case 0: {
-          // SRLIW
-          const uint32_t res = rs1 >> shift;
-          _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
-          break;
-        }
-
-        case 0x20: {
-          // SRAIW
-          const uint32_t sign = ~(((rs1 & ((uint32_t)1 << ((sizeof(uint32_t) * 8) - 1))) >> shift) - 1);
-          const uint32_t res = (rs1 >> shift) | sign;
-          _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
-          break;
-        }
-
-        default: {
-          _doILL(self, di);
-          break;
-        }
-      }
-      break;
-    }
-
-    default: {
-      _doILL(self, di);
-      break;
-    }
-  }
-}
-
 static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
+#ifdef CONFIG_RV64
   if(size != 4 && size != 8) {
+#else
+  if(size != 4) {
+#endif
     _doILL(self, di);
     return;
   }
@@ -637,7 +605,9 @@ static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
 
   cpu_word_t data = 0;
   _readMem(self, rs1, &data, size);
+#ifdef CONFIG_RV64
   data = SIGN_EXTEND(data, (size * 8) - 1, cpu_word_t);
+#endif
 
   bool needWrite = true;
   cpu_word_t rd = 0;
@@ -717,7 +687,7 @@ static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
 
 static inline void _doSTORE(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
-  if(size > 8) {
+  if(size > sizeof(cpu_word_t)) {
     _doILL(self, di);
     return;
   }
@@ -731,6 +701,11 @@ static inline void _doSTORE(RV_Cpu* self, const struct _instr *di) {
 
 static inline void _doLOAD(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << (di->funct3 & 3U);
+  if(size > sizeof(cpu_word_t)) {
+    _doILL(self, di);
+    return;
+  }
+
   const bool isSigned = !(di->funct3 & 4U);
 
   const cpu_addr_t offset = SIGN_EXTEND(di->iimm, 11, cpu_addr_t);
@@ -742,6 +717,70 @@ static inline void _doLOAD(RV_Cpu* self, const struct _instr *di) {
     data = SIGN_EXTEND(data, (size * 8) - 1, cpu_word_t);
 
   _writeReg(self, di->rd, data);
+}
+
+#ifdef CONFIG_RV64
+
+static inline void _doOPIMM32(RV_Cpu* self, const struct _instr *di) {
+  const cpu_word_t imm = SIGN_EXTEND(di->iimm, 11, cpu_word_t);
+  const uint32_t rs1 = _readReg(self, di->rs1);
+
+  switch(di->funct3) {
+    // ADDIW
+    case 0: {
+      const uint32_t res = imm + rs1;
+      _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
+      break;
+    }
+
+    case 1: {
+      switch(di->iimm >> 5) {
+        case 0: {
+          // SLLIW
+          const uint32_t res = rs1 << (di->iimm & 0x1F);
+          _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
+          break;
+        }
+
+        default: {
+          _doILL(self, di);
+          break;
+        }
+      }
+      break;
+    }
+
+    case 5: {
+      const unsigned int shift = di->iimm & 0x1F;
+      switch(di->iimm >> 5) {
+        case 0: {
+          // SRLIW
+          const uint32_t res = rs1 >> shift;
+          _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
+          break;
+        }
+
+        case 0x20: {
+          // SRAIW
+          const uint32_t sign = ~(((rs1 & ((uint32_t)1 << ((sizeof(uint32_t) * 8) - 1))) >> shift) - 1);
+          const uint32_t res = (rs1 >> shift) | sign;
+          _writeReg(self, di->rd, SIGN_EXTEND(res, 31, cpu_word_t));
+          break;
+        }
+
+        default: {
+          _doILL(self, di);
+          break;
+        }
+      }
+      break;
+    }
+
+    default: {
+      _doILL(self, di);
+      break;
+    }
+  }
 }
 
 static inline void _doOP32(RV_Cpu* self, const struct _instr *di) {
@@ -771,7 +810,7 @@ static inline void _doOP32(RV_Cpu* self, const struct _instr *di) {
     case 1: {
       switch(di->funct7) {
         // SLLW
-        case 0: _writeReg(self, di->rd, SIGN_EXTEND(rs1 << (rs2 & 0x3F), 31, cpu_word_t)); break;
+        case 0: _writeReg(self, di->rd, SIGN_EXTEND(rs1 << (rs2 & CPU_SHIFT_MASK), 31, cpu_word_t)); break;
 
         default: {
           _doILL(self, di);
@@ -884,6 +923,8 @@ static inline void _doOP32(RV_Cpu* self, const struct _instr *di) {
   }
 }
 
+#endif
+
 static inline void _execInstr(RV_Cpu* self, uint32_t instr) {
   struct _instr di;
   di.size = 4;
@@ -916,11 +957,13 @@ static inline void _execInstr(RV_Cpu* self, uint32_t instr) {
     case 0x33: _doOP(self, &di); break;
     case 0x67: _doJALR(self, &di); break;
     case 0x17: _doAUIPC(self, &di); break;
-    case 0x1B: _doOPIMM32(self, &di); break;
     case 0x2F: _doAMO(self, &di); break;
     case 0x23: _doSTORE(self, &di); break;
     case 0x03: _doLOAD(self, &di); break;
+#ifdef CONFIG_RV64
+    case 0x1B: _doOPIMM32(self, &di); break;
     case 0x3B: _doOP32(self, &di); break;
+#endif
     default:   _doILL(self, &di); break;
   }
 }

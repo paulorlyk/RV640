@@ -14,9 +14,9 @@ static inline void _flushIcache(RV_Cpu *self) {
 static inline void _trap(RV_Cpu *self, RV_MCAUSE cause, bool interrupt) {
   self->trap = true;
 
-  self->mcause = cause;
+  self->csr.mcause = cause;
   if(interrupt)
-    self->mcause |= CPU_SIGN_BIT;
+    self->csr.mcause |= CPU_SIGN_BIT;
 }
 
 static inline cpu_word_t _readReg(const RV_Cpu *self, unsigned int rd) {

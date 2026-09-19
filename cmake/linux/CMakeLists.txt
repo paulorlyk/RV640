@@ -24,10 +24,16 @@ target_link_options(${PROJECT_NAME} PRIVATE
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     _GNU_SOURCE
-    CONFIG_RV64_32BIT_ADDR=1
+#    CONFIG_RV64=1
+#    CONFIG_RV64_32BIT_ADDR=1
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND dtc -o rv640.dtb ${CMAKE_CURRENT_SOURCE_DIR}/../../dt/rv640.dts
+    COMMAND dtc -o rv640_rv32.dtb ${CMAKE_CURRENT_SOURCE_DIR}/../../dt/rv640_rv32.dts
+    VERBATIM
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND dtc -o rv640_rv64.dtb ${CMAKE_CURRENT_SOURCE_DIR}/../../dt/rv640_rv64.dts
     VERBATIM
 )

@@ -60,15 +60,20 @@ typedef struct {
   } regs;
   cpu_addr_t PC;
 
-  cpu_word_t mip; // Machine Interrupt-Pending
-  cpu_word_t mie; // Machine Interrupt-Enable
-  cpu_word_t mscratch; // Machine Scratch Register
-  cpu_word_t mstatus; // Machine Status Register
-  cpu_word_t mtvec; // Machine Trap-Vector Base-Address
-  cpu_word_t mcause;  // Machine Cause
-  cpu_word_t mepc;  // Machine Exception Program Counter Register
-  cpu_word_t mtval; // Machine Trap Value Register
-  cpu_word_t menvcfg; // Machine Environment Configuration Register
+  struct {
+    cpu_word_t mip;       // Machine Interrupt-Pending
+    cpu_word_t mie;       // Machine Interrupt-Enable
+    cpu_word_t mscratch;  // Machine Scratch Register
+    cpu_word_t mstatus;   // Machine Status Register
+#ifndef CONFIG_RV64
+    cpu_word_t mstatush;  // Additional Machine Status Register
+#endif
+    cpu_word_t mtvec;     // Machine Trap-Vector Base-Address
+    cpu_word_t mcause;    // Machine Cause
+    cpu_word_t mepc;      // Machine Exception Program Counter Register
+    cpu_word_t mtval;     // Machine Trap Value Register
+    cpu_word_t menvcfg;   // Machine Environment Configuration Register
+  } csr;
 
   bool trap;
   bool irq;

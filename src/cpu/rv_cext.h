@@ -62,6 +62,7 @@ static inline void _doCextQ0_2(RV_Cpu* self, unsigned int instr, struct _instr *
 }
 
 static inline void _doCextQ0_3(RV_Cpu* self, unsigned int instr, struct _instr *di) {
+#ifdef CONFIG_RV64
   // c.ld -> ld rd', offset(rs1')
   di->funct3 = 3;
   di->rd = ((instr >> 2) & 0x7) + 8;
@@ -69,6 +70,11 @@ static inline void _doCextQ0_3(RV_Cpu* self, unsigned int instr, struct _instr *
   di->iimm = ((instr >> 7) & (0x7LU << 3)) | ((instr << 1) & (3LU << 6));
 
   _doLOAD(self, di);
+#else
+  (void)instr;
+
+  _doILL(self, di);
+#endif
 }
 
 static inline void _doCextQ0_4(RV_Cpu* self, unsigned int instr, struct _instr *di) {
@@ -96,6 +102,7 @@ static inline void _doCextQ0_6(RV_Cpu* self, unsigned int instr, struct _instr *
 }
 
 static inline void _doCextQ0_7(RV_Cpu* self, unsigned int instr, struct _instr *di) {
+#ifdef CONFIG_RV64
   // c.sd -> sd rs2', offset(rs1')
   di->funct3 = 3;
   di->rs1 = ((instr >> 7) & 0x7) + 8;
@@ -103,6 +110,11 @@ static inline void _doCextQ0_7(RV_Cpu* self, unsigned int instr, struct _instr *
   di->simm = ((instr >> 7) & (0x7LU << 3)) | ((instr << 1) & (3LU << 6));
 
   _doSTORE(self, di);
+#else
+  (void)instr;
+
+  _doILL(self, di);
+#endif
 }
 
 static inline void _doCextQ1_0(RV_Cpu* self, unsigned int instr, struct _instr *di) {
@@ -129,6 +141,7 @@ static inline void _doCextQ1_0(RV_Cpu* self, unsigned int instr, struct _instr *
 }
 
 static inline void _doCextQ1_1(RV_Cpu* self, unsigned int instr, struct _instr *di) {
+#ifdef CONFIG_RV64
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.addiw -> addiw rd, rd, imm
@@ -144,6 +157,16 @@ static inline void _doCextQ1_1(RV_Cpu* self, unsigned int instr, struct _instr *
     // reserved -> illegal
     _doILL(self, di);
   }
+#else
+  // c.jal -> jal x1, offset
+  const uint32_t imm = (instr >> 2) & 0x7FF;
+  const uint32_t offset = SIGN_EXTEND(ASSEMBLE_11(imm, 5, 1, 2, 3, 7, 6, 10, 8, 9, 4, 11), 11, uint32_t);
+
+  di->rd = CPU_REG_X1;
+  di->jimm = offset;
+
+  _doJAL(self, di);
+#endif
 }
 
 static inline void _doCextQ1_2(RV_Cpu* self, unsigned int instr, struct _instr *di) {
@@ -241,6 +264,7 @@ static inline void _doCextQ1_4(RV_Cpu* self, unsigned int instr, struct _instr *
 
     case 3: {
       if(instr & (1U << 12)) {
+#ifdef CONFIG_RV64
         const unsigned int rs2 = ((instr >> 2) & 0x7) + 8;
         switch((instr >> 5) & 3) {
           default:
@@ -275,6 +299,9 @@ static inline void _doCextQ1_4(RV_Cpu* self, unsigned int instr, struct _instr *
             break;
           }
         }
+#else
+        _doILL(self, di);
+#endif
       } else {
         const unsigned int rs2 = ((instr >> 2) & 0x7) + 8;
         switch((instr >> 5) & 3) {
@@ -411,6 +438,7 @@ static inline void _doCextQ2_2(RV_Cpu* self, unsigned int instr, struct _instr *
 }
 
 static inline void _doCextQ2_3(RV_Cpu* self, unsigned int instr, struct _instr *di) {
+#ifdef CONFIG_RV64
   const unsigned int rd = (instr >> 7) & 0x1F;
   if(rd) {
     // c.ldsp -> ld rd, imm(x2)
@@ -424,6 +452,11 @@ static inline void _doCextQ2_3(RV_Cpu* self, unsigned int instr, struct _instr *
     // reserved -> illegal
     _doILL(self, di);
   }
+#else
+  (void)instr;
+
+  _doILL(self, di);
+#endif
 }
 
 static inline void _doCextQ2_4(RV_Cpu* self, unsigned int instr, struct _instr *di) {
@@ -514,6 +547,7 @@ static inline void _doCextQ2_6(RV_Cpu* self, unsigned int instr, struct _instr *
 }
 
 static inline void _doCextQ2_7(RV_Cpu* self, unsigned int instr, struct _instr *di) {
+#ifdef CONFIG_RV64
   // c.sdsp -> sd rs2, imm(x2)
   di->funct3 = 3;
   di->rs1 = CPU_REG_SP;
@@ -521,6 +555,11 @@ static inline void _doCextQ2_7(RV_Cpu* self, unsigned int instr, struct _instr *
   di->simm = ((instr >> 7) & (7LU << 3)) | ((instr >> 1) & (7LU << 6));
 
   _doSTORE(self, di);
+#else
+  (void)instr;
+
+  _doILL(self, di);
+#endif
 }
 
 static inline bool _execCext(RV_Cpu* self, uint32_t instr) {

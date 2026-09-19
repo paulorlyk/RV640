@@ -18,7 +18,7 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
 
   switch(csr) {
     // MSTATUS
-    case 0x300: return self->mstatus;
+    case 0x300: return self->csr.mstatus;
 
     case 0x301: {
       // MISA
@@ -30,28 +30,33 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     }
 
     // MIE
-    case 0x304: return self->mie;
+    case 0x304: return self->csr.mie;
 
     // MTVEC
-    case 0x305: return self->mtvec;
+    case 0x305: return self->csr.mtvec;
 
     // MENVCFG
-    case 0x30A: return self->menvcfg;
+    case 0x30A: return self->csr.menvcfg;
+
+#ifndef CONFIG_RV64
+    // MSTATUSH
+    case 0x310: return self->csr.mstatush;
+#endif
 
     // MSCRATCH
-    case 0x340: return self->mscratch;
+    case 0x340: return self->csr.mscratch;
 
     // MEPC
-    case 0x341: return self->mepc;
+    case 0x341: return self->csr.mepc;
 
     // MCAUSE
-    case 0x342: return self->mcause;
+    case 0x342: return self->csr.mcause;
 
     // MTVAL
-    case 0x343: return self->mtval;
+    case 0x343: return self->csr.mtval;
 
     // MIP
-    case 0x344: return self->mip;
+    case 0x344: return self->csr.mip;
 
     // MVENDORID
     case 0xF11:
@@ -80,8 +85,9 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
   switch(csr) {
     case 0x300: {
       // MSTATUS
-      self->irq = (self->mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK));
-      self->mstatus = MSTATUS_WR_VAL(val);
+      self->irq = (self->csr.mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK));
+      self->csr.mstatus = MSTATUS_WR_VAL(val);
+      break;
     }
 
     // MISA
@@ -98,47 +104,55 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x304: {
       // MIE
-      const cpu_word_t newMie = (self->mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
-      self->irq = self->mie != newMie;
-      self->mie = newMie;
+      const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
+      self->irq = self->csr.mie != newMie;
+      self->csr.mie = newMie;
       break;
     }
 
     case 0x305: {
       // MTVEC
-      self->mtvec = val;
+      self->csr.mtvec = val;
       break;
     }
 
     case 0x30A: {
       // MENVCFG
-      self->menvcfg = val;
+      self->csr.menvcfg = val;
       break;
     }
 
+#ifndef CONFIG_RV64
+    case 0x310: {
+      // MSTATUSH
+      self->csr.mstatush = MSTATUSH_WR_VAL(val);
+      break;
+    }
+#endif
+
     case 0x340: {
       // MSCRATCH
-      self->mscratch = val;
+      self->csr.mscratch = val;
       break;
     }
 
     case 0x341: {
       // MEPC
-      self->mepc = val & ~(cpu_word_t)1;
+      self->csr.mepc = val & ~(cpu_word_t)1;
       break;
     }
 
     case 0x343: {
       // MTVAL
-      self->mtval = val;
+      self->csr.mtval = val;
       break;
     }
 
     case 0x344: {
       // MIP
-      const cpu_word_t newMip = (self->mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
-      self->irq = self->mip != newMip;
-      self->mip = newMip;
+      const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
+      self->irq = self->csr.mip != newMip;
+      self->csr.mip = newMip;
       break;
     }
 
