@@ -17,9 +17,19 @@
 #include <stdio.h>
 #include <i86.h>
 
+#ifdef CONFIG_RV64
+
 #define MEM_PAGES 80
 
 #define MEM_PAGE_ADDR_SHIFT 12U
+
+#else
+
+#define MEM_PAGES 160
+
+#define MEM_PAGE_ADDR_SHIFT 11U
+
+#endif
 
 #define MEM_PAGE_SIZE (1UL << MEM_PAGE_ADDR_SHIFT)
 
