@@ -72,9 +72,80 @@
     jal     ra, check
 .endm
 
+/* T_A4SPN_CROSS rdreg, imm, name
+ *   The bit-independence defense: T_A4SPN_REG and T_A4SPN_IMM above
+ *   each vary *one* field while holding the other fixed, which can
+ *   never expose a bug where a specific bit of nzuimm only misbehaves
+ *   for specific values of rd' (e.g. a decoder wiring fault where
+ *   nzuimm bit 2 leaks into the logic that also selects rd', so the
+ *   corruption only shows up for some register encodings and not
+ *   others). This macro is the fix: every individual nzuimm bit,
+ *   crossed against every legal rd', so no (bit, register) pairing
+ *   goes unchecked. Same a0/a1/a2 safety as T_A4SPN_REG.
+ */
+.macro T_A4SPN_CROSS rdreg, imm, name
+    mv      t1, sp
+    addi    t1, t1, \imm
+    .option rvc
+    c.addi4spn \rdreg, sp, \imm
+    .option norvc
+    mv      t2, \rdreg
+    la      a0, \name
+    mv      a1, t1
+    mv      a2, t2
+    jal     ra, check
+.endm
+
+/* T_A4SPN_PAIR imm, name
+ *   The complementary defense *within* the nzuimm field itself: fixed
+ *   rd'=s0, but the immediate under test has *two* individual bits set
+ *   together (every one of the C(8,2)=28 possible pairs among the 8
+ *   encodable bit positions), rather than one bit alone or all of them
+ *   at once. A coupling bug between two specific nzuimm bits -- as
+ *   opposed to a whole-field or single-bit fault -- would only show up
+ *   when exactly that pair is set simultaneously, which neither a
+ *   single-bit sweep nor the earlier "all bits" (1020) case is
+ *   guaranteed to exercise.
+ */
+.macro T_A4SPN_PAIR imm, name
+    mv      t1, sp
+    addi    t1, t1, \imm
+    .option rvc
+    c.addi4spn s0, sp, \imm
+    .option norvc
+    la      a0, \name
+    mv      a1, t1
+    mv      a2, s0
+    jal     ra, check
+.endm
+
 /* =======================================================================
  *  C.ADDI4SPN : rd' = sp + nzuimm  (CIW format, rd' in x8-x15 only,
  *               nzuimm is an unsigned multiple of 4 in [4, 1020])
+ *
+ *  Coverage here goes beyond independent per-field sweeps. The
+ *  original register sweep (T_A4SPN_REG) and immediate sweep
+ *  (T_A4SPN_IMM) below each vary exactly one of the instruction's two
+ *  variable fields (rd', nzuimm) while holding the other fixed -- which
+ *  is enough to catch a bug confined *within* one field, but is blind
+ *  to any bug where a bit's effect depends on what the *other* field
+ *  currently holds. A concrete example: a decoder fault where nzuimm
+ *  bit 2 (instruction bit 6) is incorrectly OR'd into bit 1 of the
+ *  instruction's own opcode field, corrupting quadrant selection --
+ *  such a fault could easily be masked for one particular rd' encoding
+ *  (e.g. rd'=s0, the only register the immediate sweep ever uses)
+ *  while still being wrong for every other one.
+ *
+ *  T_A4SPN_CROSS closes that gap with a genuine cross-product: every
+ *  individual nzuimm bit position, crossed against every legal rd'
+ *  register (8 x 11 = 88 cases). T_A4SPN_PAIR adds the complementary
+ *  check *within* the nzuimm field: every pair of individual bits set
+ *  together (28 cases), which neither a single-bit sweep nor the
+ *  "all bits" boundary case is guaranteed to exercise. Together these
+ *  are the general defense against "any bit of any variable part of
+ *  the instruction can be corrupt [and only manifest in combination
+ *  with some other bit]" -- not just a defense against the one
+ *  bit2/opcode-bit1 example that motivated them.
  * ======================================================================= */
 test_c_addi4spn:
     addi    sp, sp, -16
@@ -112,6 +183,162 @@ test_c_addi4spn:
     c.addi4spn s0, sp, 24
     .option norvc
     la      a0, str_a4spn_sp_preserved
+    mv      a1, t3
+    mv      a2, sp
+    jal     ra, check
+
+    /* --- bit-independence: every individual nzuimm bit (and the max
+     *     / alternating-pattern boundary cases) crossed against every
+     *     legal rd' register -- see the file-header note above for why
+     *     this is necessary and what class of bug it defends against. --- */
+    T_A4SPN_CROSS s0, 4   , str_a4spn_x_s0_b2
+    T_A4SPN_CROSS s0, 8   , str_a4spn_x_s0_b3
+    T_A4SPN_CROSS s0, 16  , str_a4spn_x_s0_b4
+    T_A4SPN_CROSS s0, 32  , str_a4spn_x_s0_b5
+    T_A4SPN_CROSS s0, 64  , str_a4spn_x_s0_b6
+    T_A4SPN_CROSS s0, 128 , str_a4spn_x_s0_b7
+    T_A4SPN_CROSS s0, 256 , str_a4spn_x_s0_b8
+    T_A4SPN_CROSS s0, 512 , str_a4spn_x_s0_b9
+    T_A4SPN_CROSS s0, 1020, str_a4spn_x_s0_max
+    T_A4SPN_CROSS s0, 340 , str_a4spn_x_s0_alt0
+    T_A4SPN_CROSS s0, 680 , str_a4spn_x_s0_alt1
+    T_A4SPN_CROSS s1, 4   , str_a4spn_x_s1_b2
+    T_A4SPN_CROSS s1, 8   , str_a4spn_x_s1_b3
+    T_A4SPN_CROSS s1, 16  , str_a4spn_x_s1_b4
+    T_A4SPN_CROSS s1, 32  , str_a4spn_x_s1_b5
+    T_A4SPN_CROSS s1, 64  , str_a4spn_x_s1_b6
+    T_A4SPN_CROSS s1, 128 , str_a4spn_x_s1_b7
+    T_A4SPN_CROSS s1, 256 , str_a4spn_x_s1_b8
+    T_A4SPN_CROSS s1, 512 , str_a4spn_x_s1_b9
+    T_A4SPN_CROSS s1, 1020, str_a4spn_x_s1_max
+    T_A4SPN_CROSS s1, 340 , str_a4spn_x_s1_alt0
+    T_A4SPN_CROSS s1, 680 , str_a4spn_x_s1_alt1
+    T_A4SPN_CROSS a0, 4   , str_a4spn_x_a0_b2
+    T_A4SPN_CROSS a0, 8   , str_a4spn_x_a0_b3
+    T_A4SPN_CROSS a0, 16  , str_a4spn_x_a0_b4
+    T_A4SPN_CROSS a0, 32  , str_a4spn_x_a0_b5
+    T_A4SPN_CROSS a0, 64  , str_a4spn_x_a0_b6
+    T_A4SPN_CROSS a0, 128 , str_a4spn_x_a0_b7
+    T_A4SPN_CROSS a0, 256 , str_a4spn_x_a0_b8
+    T_A4SPN_CROSS a0, 512 , str_a4spn_x_a0_b9
+    T_A4SPN_CROSS a0, 1020, str_a4spn_x_a0_max
+    T_A4SPN_CROSS a0, 340 , str_a4spn_x_a0_alt0
+    T_A4SPN_CROSS a0, 680 , str_a4spn_x_a0_alt1
+    T_A4SPN_CROSS a1, 4   , str_a4spn_x_a1_b2
+    T_A4SPN_CROSS a1, 8   , str_a4spn_x_a1_b3
+    T_A4SPN_CROSS a1, 16  , str_a4spn_x_a1_b4
+    T_A4SPN_CROSS a1, 32  , str_a4spn_x_a1_b5
+    T_A4SPN_CROSS a1, 64  , str_a4spn_x_a1_b6
+    T_A4SPN_CROSS a1, 128 , str_a4spn_x_a1_b7
+    T_A4SPN_CROSS a1, 256 , str_a4spn_x_a1_b8
+    T_A4SPN_CROSS a1, 512 , str_a4spn_x_a1_b9
+    T_A4SPN_CROSS a1, 1020, str_a4spn_x_a1_max
+    T_A4SPN_CROSS a1, 340 , str_a4spn_x_a1_alt0
+    T_A4SPN_CROSS a1, 680 , str_a4spn_x_a1_alt1
+    T_A4SPN_CROSS a2, 4   , str_a4spn_x_a2_b2
+    T_A4SPN_CROSS a2, 8   , str_a4spn_x_a2_b3
+    T_A4SPN_CROSS a2, 16  , str_a4spn_x_a2_b4
+    T_A4SPN_CROSS a2, 32  , str_a4spn_x_a2_b5
+    T_A4SPN_CROSS a2, 64  , str_a4spn_x_a2_b6
+    T_A4SPN_CROSS a2, 128 , str_a4spn_x_a2_b7
+    T_A4SPN_CROSS a2, 256 , str_a4spn_x_a2_b8
+    T_A4SPN_CROSS a2, 512 , str_a4spn_x_a2_b9
+    T_A4SPN_CROSS a2, 1020, str_a4spn_x_a2_max
+    T_A4SPN_CROSS a2, 340 , str_a4spn_x_a2_alt0
+    T_A4SPN_CROSS a2, 680 , str_a4spn_x_a2_alt1
+    T_A4SPN_CROSS a3, 4   , str_a4spn_x_a3_b2
+    T_A4SPN_CROSS a3, 8   , str_a4spn_x_a3_b3
+    T_A4SPN_CROSS a3, 16  , str_a4spn_x_a3_b4
+    T_A4SPN_CROSS a3, 32  , str_a4spn_x_a3_b5
+    T_A4SPN_CROSS a3, 64  , str_a4spn_x_a3_b6
+    T_A4SPN_CROSS a3, 128 , str_a4spn_x_a3_b7
+    T_A4SPN_CROSS a3, 256 , str_a4spn_x_a3_b8
+    T_A4SPN_CROSS a3, 512 , str_a4spn_x_a3_b9
+    T_A4SPN_CROSS a3, 1020, str_a4spn_x_a3_max
+    T_A4SPN_CROSS a3, 340 , str_a4spn_x_a3_alt0
+    T_A4SPN_CROSS a3, 680 , str_a4spn_x_a3_alt1
+    T_A4SPN_CROSS a4, 4   , str_a4spn_x_a4_b2
+    T_A4SPN_CROSS a4, 8   , str_a4spn_x_a4_b3
+    T_A4SPN_CROSS a4, 16  , str_a4spn_x_a4_b4
+    T_A4SPN_CROSS a4, 32  , str_a4spn_x_a4_b5
+    T_A4SPN_CROSS a4, 64  , str_a4spn_x_a4_b6
+    T_A4SPN_CROSS a4, 128 , str_a4spn_x_a4_b7
+    T_A4SPN_CROSS a4, 256 , str_a4spn_x_a4_b8
+    T_A4SPN_CROSS a4, 512 , str_a4spn_x_a4_b9
+    T_A4SPN_CROSS a4, 1020, str_a4spn_x_a4_max
+    T_A4SPN_CROSS a4, 340 , str_a4spn_x_a4_alt0
+    T_A4SPN_CROSS a4, 680 , str_a4spn_x_a4_alt1
+    T_A4SPN_CROSS a5, 4   , str_a4spn_x_a5_b2
+    T_A4SPN_CROSS a5, 8   , str_a4spn_x_a5_b3
+    T_A4SPN_CROSS a5, 16  , str_a4spn_x_a5_b4
+    T_A4SPN_CROSS a5, 32  , str_a4spn_x_a5_b5
+    T_A4SPN_CROSS a5, 64  , str_a4spn_x_a5_b6
+    T_A4SPN_CROSS a5, 128 , str_a4spn_x_a5_b7
+    T_A4SPN_CROSS a5, 256 , str_a4spn_x_a5_b8
+    T_A4SPN_CROSS a5, 512 , str_a4spn_x_a5_b9
+    T_A4SPN_CROSS a5, 1020, str_a4spn_x_a5_max
+    T_A4SPN_CROSS a5, 340 , str_a4spn_x_a5_alt0
+    T_A4SPN_CROSS a5, 680 , str_a4spn_x_a5_alt1
+
+    /* --- within-field pairwise: every pair of individual nzuimm bits
+     *     set together, fixed rd'=s0 --- */
+    T_A4SPN_PAIR 12  , str_a4spn_pair_b2_b3
+    T_A4SPN_PAIR 20  , str_a4spn_pair_b2_b4
+    T_A4SPN_PAIR 36  , str_a4spn_pair_b2_b5
+    T_A4SPN_PAIR 68  , str_a4spn_pair_b2_b6
+    T_A4SPN_PAIR 132 , str_a4spn_pair_b2_b7
+    T_A4SPN_PAIR 260 , str_a4spn_pair_b2_b8
+    T_A4SPN_PAIR 516 , str_a4spn_pair_b2_b9
+    T_A4SPN_PAIR 24  , str_a4spn_pair_b3_b4
+    T_A4SPN_PAIR 40  , str_a4spn_pair_b3_b5
+    T_A4SPN_PAIR 72  , str_a4spn_pair_b3_b6
+    T_A4SPN_PAIR 136 , str_a4spn_pair_b3_b7
+    T_A4SPN_PAIR 264 , str_a4spn_pair_b3_b8
+    T_A4SPN_PAIR 520 , str_a4spn_pair_b3_b9
+    T_A4SPN_PAIR 48  , str_a4spn_pair_b4_b5
+    T_A4SPN_PAIR 80  , str_a4spn_pair_b4_b6
+    T_A4SPN_PAIR 144 , str_a4spn_pair_b4_b7
+    T_A4SPN_PAIR 272 , str_a4spn_pair_b4_b8
+    T_A4SPN_PAIR 528 , str_a4spn_pair_b4_b9
+    T_A4SPN_PAIR 96  , str_a4spn_pair_b5_b6
+    T_A4SPN_PAIR 160 , str_a4spn_pair_b5_b7
+    T_A4SPN_PAIR 288 , str_a4spn_pair_b5_b8
+    T_A4SPN_PAIR 544 , str_a4spn_pair_b5_b9
+    T_A4SPN_PAIR 192 , str_a4spn_pair_b6_b7
+    T_A4SPN_PAIR 320 , str_a4spn_pair_b6_b8
+    T_A4SPN_PAIR 576 , str_a4spn_pair_b6_b9
+    T_A4SPN_PAIR 384 , str_a4spn_pair_b7_b8
+    T_A4SPN_PAIR 640 , str_a4spn_pair_b7_b9
+    T_A4SPN_PAIR 768 , str_a4spn_pair_b8_b9
+
+    /* --- sp-preserved invariant, re-checked at a spread of different
+     *     (rd', nzuimm) combinations from the cross-product above, not
+     *     just the single case already covered -- a bit-coupling bug
+     *     could plausibly corrupt sp itself for some combinations and
+     *     not others. --- */
+    mv      t3, sp
+    .option rvc
+    c.addi4spn a3, sp, 132       /* bits 2+7 */
+    .option norvc
+    la      a0, str_a4spn_sp_preserved_2
+    mv      a1, t3
+    mv      a2, sp
+    jal     ra, check
+
+    mv      t3, sp
+    .option rvc
+    c.addi4spn a5, sp, 1020      /* max, all bits */
+    .option norvc
+    la      a0, str_a4spn_sp_preserved_3
+    mv      a1, t3
+    mv      a2, sp
+    jal     ra, check
+
+    mv      t3, sp
+    .option rvc
+    c.addi4spn s1, sp, 340       /* alternating pattern */
+    .option norvc
+    la      a0, str_a4spn_sp_preserved_4
     mv      a1, t3
     mv      a2, sp
     jal     ra, check
@@ -823,6 +1050,125 @@ str_a4spn_imm1020:   .asciz "C.ADDI4SPN imm=1020 (max, all bits)"
 str_a4spn_imm340:    .asciz "C.ADDI4SPN imm=340 (alt pattern 01010101)"
 str_a4spn_imm680:    .asciz "C.ADDI4SPN imm=680 (alt pattern 10101010)"
 str_a4spn_sp_preserved: .asciz "C.ADDI4SPN sp unmodified"
+str_a4spn_x_s0_b2: .asciz "C.ADDI4SPN rd=s0 x nzuimm=4 (bit2)"
+str_a4spn_x_s0_b3: .asciz "C.ADDI4SPN rd=s0 x nzuimm=8 (bit3)"
+str_a4spn_x_s0_b4: .asciz "C.ADDI4SPN rd=s0 x nzuimm=16 (bit4)"
+str_a4spn_x_s0_b5: .asciz "C.ADDI4SPN rd=s0 x nzuimm=32 (bit5)"
+str_a4spn_x_s0_b6: .asciz "C.ADDI4SPN rd=s0 x nzuimm=64 (bit6)"
+str_a4spn_x_s0_b7: .asciz "C.ADDI4SPN rd=s0 x nzuimm=128 (bit7)"
+str_a4spn_x_s0_b8: .asciz "C.ADDI4SPN rd=s0 x nzuimm=256 (bit8)"
+str_a4spn_x_s0_b9: .asciz "C.ADDI4SPN rd=s0 x nzuimm=512 (bit9)"
+str_a4spn_x_s0_max: .asciz "C.ADDI4SPN rd=s0 x nzuimm=1020 (max)"
+str_a4spn_x_s0_alt0: .asciz "C.ADDI4SPN rd=s0 x nzuimm=340 (alt0)"
+str_a4spn_x_s0_alt1: .asciz "C.ADDI4SPN rd=s0 x nzuimm=680 (alt1)"
+str_a4spn_x_s1_b2: .asciz "C.ADDI4SPN rd=s1 x nzuimm=4 (bit2)"
+str_a4spn_x_s1_b3: .asciz "C.ADDI4SPN rd=s1 x nzuimm=8 (bit3)"
+str_a4spn_x_s1_b4: .asciz "C.ADDI4SPN rd=s1 x nzuimm=16 (bit4)"
+str_a4spn_x_s1_b5: .asciz "C.ADDI4SPN rd=s1 x nzuimm=32 (bit5)"
+str_a4spn_x_s1_b6: .asciz "C.ADDI4SPN rd=s1 x nzuimm=64 (bit6)"
+str_a4spn_x_s1_b7: .asciz "C.ADDI4SPN rd=s1 x nzuimm=128 (bit7)"
+str_a4spn_x_s1_b8: .asciz "C.ADDI4SPN rd=s1 x nzuimm=256 (bit8)"
+str_a4spn_x_s1_b9: .asciz "C.ADDI4SPN rd=s1 x nzuimm=512 (bit9)"
+str_a4spn_x_s1_max: .asciz "C.ADDI4SPN rd=s1 x nzuimm=1020 (max)"
+str_a4spn_x_s1_alt0: .asciz "C.ADDI4SPN rd=s1 x nzuimm=340 (alt0)"
+str_a4spn_x_s1_alt1: .asciz "C.ADDI4SPN rd=s1 x nzuimm=680 (alt1)"
+str_a4spn_x_a0_b2: .asciz "C.ADDI4SPN rd=a0 x nzuimm=4 (bit2)"
+str_a4spn_x_a0_b3: .asciz "C.ADDI4SPN rd=a0 x nzuimm=8 (bit3)"
+str_a4spn_x_a0_b4: .asciz "C.ADDI4SPN rd=a0 x nzuimm=16 (bit4)"
+str_a4spn_x_a0_b5: .asciz "C.ADDI4SPN rd=a0 x nzuimm=32 (bit5)"
+str_a4spn_x_a0_b6: .asciz "C.ADDI4SPN rd=a0 x nzuimm=64 (bit6)"
+str_a4spn_x_a0_b7: .asciz "C.ADDI4SPN rd=a0 x nzuimm=128 (bit7)"
+str_a4spn_x_a0_b8: .asciz "C.ADDI4SPN rd=a0 x nzuimm=256 (bit8)"
+str_a4spn_x_a0_b9: .asciz "C.ADDI4SPN rd=a0 x nzuimm=512 (bit9)"
+str_a4spn_x_a0_max: .asciz "C.ADDI4SPN rd=a0 x nzuimm=1020 (max)"
+str_a4spn_x_a0_alt0: .asciz "C.ADDI4SPN rd=a0 x nzuimm=340 (alt0)"
+str_a4spn_x_a0_alt1: .asciz "C.ADDI4SPN rd=a0 x nzuimm=680 (alt1)"
+str_a4spn_x_a1_b2: .asciz "C.ADDI4SPN rd=a1 x nzuimm=4 (bit2)"
+str_a4spn_x_a1_b3: .asciz "C.ADDI4SPN rd=a1 x nzuimm=8 (bit3)"
+str_a4spn_x_a1_b4: .asciz "C.ADDI4SPN rd=a1 x nzuimm=16 (bit4)"
+str_a4spn_x_a1_b5: .asciz "C.ADDI4SPN rd=a1 x nzuimm=32 (bit5)"
+str_a4spn_x_a1_b6: .asciz "C.ADDI4SPN rd=a1 x nzuimm=64 (bit6)"
+str_a4spn_x_a1_b7: .asciz "C.ADDI4SPN rd=a1 x nzuimm=128 (bit7)"
+str_a4spn_x_a1_b8: .asciz "C.ADDI4SPN rd=a1 x nzuimm=256 (bit8)"
+str_a4spn_x_a1_b9: .asciz "C.ADDI4SPN rd=a1 x nzuimm=512 (bit9)"
+str_a4spn_x_a1_max: .asciz "C.ADDI4SPN rd=a1 x nzuimm=1020 (max)"
+str_a4spn_x_a1_alt0: .asciz "C.ADDI4SPN rd=a1 x nzuimm=340 (alt0)"
+str_a4spn_x_a1_alt1: .asciz "C.ADDI4SPN rd=a1 x nzuimm=680 (alt1)"
+str_a4spn_x_a2_b2: .asciz "C.ADDI4SPN rd=a2 x nzuimm=4 (bit2)"
+str_a4spn_x_a2_b3: .asciz "C.ADDI4SPN rd=a2 x nzuimm=8 (bit3)"
+str_a4spn_x_a2_b4: .asciz "C.ADDI4SPN rd=a2 x nzuimm=16 (bit4)"
+str_a4spn_x_a2_b5: .asciz "C.ADDI4SPN rd=a2 x nzuimm=32 (bit5)"
+str_a4spn_x_a2_b6: .asciz "C.ADDI4SPN rd=a2 x nzuimm=64 (bit6)"
+str_a4spn_x_a2_b7: .asciz "C.ADDI4SPN rd=a2 x nzuimm=128 (bit7)"
+str_a4spn_x_a2_b8: .asciz "C.ADDI4SPN rd=a2 x nzuimm=256 (bit8)"
+str_a4spn_x_a2_b9: .asciz "C.ADDI4SPN rd=a2 x nzuimm=512 (bit9)"
+str_a4spn_x_a2_max: .asciz "C.ADDI4SPN rd=a2 x nzuimm=1020 (max)"
+str_a4spn_x_a2_alt0: .asciz "C.ADDI4SPN rd=a2 x nzuimm=340 (alt0)"
+str_a4spn_x_a2_alt1: .asciz "C.ADDI4SPN rd=a2 x nzuimm=680 (alt1)"
+str_a4spn_x_a3_b2: .asciz "C.ADDI4SPN rd=a3 x nzuimm=4 (bit2)"
+str_a4spn_x_a3_b3: .asciz "C.ADDI4SPN rd=a3 x nzuimm=8 (bit3)"
+str_a4spn_x_a3_b4: .asciz "C.ADDI4SPN rd=a3 x nzuimm=16 (bit4)"
+str_a4spn_x_a3_b5: .asciz "C.ADDI4SPN rd=a3 x nzuimm=32 (bit5)"
+str_a4spn_x_a3_b6: .asciz "C.ADDI4SPN rd=a3 x nzuimm=64 (bit6)"
+str_a4spn_x_a3_b7: .asciz "C.ADDI4SPN rd=a3 x nzuimm=128 (bit7)"
+str_a4spn_x_a3_b8: .asciz "C.ADDI4SPN rd=a3 x nzuimm=256 (bit8)"
+str_a4spn_x_a3_b9: .asciz "C.ADDI4SPN rd=a3 x nzuimm=512 (bit9)"
+str_a4spn_x_a3_max: .asciz "C.ADDI4SPN rd=a3 x nzuimm=1020 (max)"
+str_a4spn_x_a3_alt0: .asciz "C.ADDI4SPN rd=a3 x nzuimm=340 (alt0)"
+str_a4spn_x_a3_alt1: .asciz "C.ADDI4SPN rd=a3 x nzuimm=680 (alt1)"
+str_a4spn_x_a4_b2: .asciz "C.ADDI4SPN rd=a4 x nzuimm=4 (bit2)"
+str_a4spn_x_a4_b3: .asciz "C.ADDI4SPN rd=a4 x nzuimm=8 (bit3)"
+str_a4spn_x_a4_b4: .asciz "C.ADDI4SPN rd=a4 x nzuimm=16 (bit4)"
+str_a4spn_x_a4_b5: .asciz "C.ADDI4SPN rd=a4 x nzuimm=32 (bit5)"
+str_a4spn_x_a4_b6: .asciz "C.ADDI4SPN rd=a4 x nzuimm=64 (bit6)"
+str_a4spn_x_a4_b7: .asciz "C.ADDI4SPN rd=a4 x nzuimm=128 (bit7)"
+str_a4spn_x_a4_b8: .asciz "C.ADDI4SPN rd=a4 x nzuimm=256 (bit8)"
+str_a4spn_x_a4_b9: .asciz "C.ADDI4SPN rd=a4 x nzuimm=512 (bit9)"
+str_a4spn_x_a4_max: .asciz "C.ADDI4SPN rd=a4 x nzuimm=1020 (max)"
+str_a4spn_x_a4_alt0: .asciz "C.ADDI4SPN rd=a4 x nzuimm=340 (alt0)"
+str_a4spn_x_a4_alt1: .asciz "C.ADDI4SPN rd=a4 x nzuimm=680 (alt1)"
+str_a4spn_x_a5_b2: .asciz "C.ADDI4SPN rd=a5 x nzuimm=4 (bit2)"
+str_a4spn_x_a5_b3: .asciz "C.ADDI4SPN rd=a5 x nzuimm=8 (bit3)"
+str_a4spn_x_a5_b4: .asciz "C.ADDI4SPN rd=a5 x nzuimm=16 (bit4)"
+str_a4spn_x_a5_b5: .asciz "C.ADDI4SPN rd=a5 x nzuimm=32 (bit5)"
+str_a4spn_x_a5_b6: .asciz "C.ADDI4SPN rd=a5 x nzuimm=64 (bit6)"
+str_a4spn_x_a5_b7: .asciz "C.ADDI4SPN rd=a5 x nzuimm=128 (bit7)"
+str_a4spn_x_a5_b8: .asciz "C.ADDI4SPN rd=a5 x nzuimm=256 (bit8)"
+str_a4spn_x_a5_b9: .asciz "C.ADDI4SPN rd=a5 x nzuimm=512 (bit9)"
+str_a4spn_x_a5_max: .asciz "C.ADDI4SPN rd=a5 x nzuimm=1020 (max)"
+str_a4spn_x_a5_alt0: .asciz "C.ADDI4SPN rd=a5 x nzuimm=340 (alt0)"
+str_a4spn_x_a5_alt1: .asciz "C.ADDI4SPN rd=a5 x nzuimm=680 (alt1)"
+str_a4spn_pair_b2_b3: .asciz "C.ADDI4SPN nzuimm bits 2+3 together (=12)"
+str_a4spn_pair_b2_b4: .asciz "C.ADDI4SPN nzuimm bits 2+4 together (=20)"
+str_a4spn_pair_b2_b5: .asciz "C.ADDI4SPN nzuimm bits 2+5 together (=36)"
+str_a4spn_pair_b2_b6: .asciz "C.ADDI4SPN nzuimm bits 2+6 together (=68)"
+str_a4spn_pair_b2_b7: .asciz "C.ADDI4SPN nzuimm bits 2+7 together (=132)"
+str_a4spn_pair_b2_b8: .asciz "C.ADDI4SPN nzuimm bits 2+8 together (=260)"
+str_a4spn_pair_b2_b9: .asciz "C.ADDI4SPN nzuimm bits 2+9 together (=516)"
+str_a4spn_pair_b3_b4: .asciz "C.ADDI4SPN nzuimm bits 3+4 together (=24)"
+str_a4spn_pair_b3_b5: .asciz "C.ADDI4SPN nzuimm bits 3+5 together (=40)"
+str_a4spn_pair_b3_b6: .asciz "C.ADDI4SPN nzuimm bits 3+6 together (=72)"
+str_a4spn_pair_b3_b7: .asciz "C.ADDI4SPN nzuimm bits 3+7 together (=136)"
+str_a4spn_pair_b3_b8: .asciz "C.ADDI4SPN nzuimm bits 3+8 together (=264)"
+str_a4spn_pair_b3_b9: .asciz "C.ADDI4SPN nzuimm bits 3+9 together (=520)"
+str_a4spn_pair_b4_b5: .asciz "C.ADDI4SPN nzuimm bits 4+5 together (=48)"
+str_a4spn_pair_b4_b6: .asciz "C.ADDI4SPN nzuimm bits 4+6 together (=80)"
+str_a4spn_pair_b4_b7: .asciz "C.ADDI4SPN nzuimm bits 4+7 together (=144)"
+str_a4spn_pair_b4_b8: .asciz "C.ADDI4SPN nzuimm bits 4+8 together (=272)"
+str_a4spn_pair_b4_b9: .asciz "C.ADDI4SPN nzuimm bits 4+9 together (=528)"
+str_a4spn_pair_b5_b6: .asciz "C.ADDI4SPN nzuimm bits 5+6 together (=96)"
+str_a4spn_pair_b5_b7: .asciz "C.ADDI4SPN nzuimm bits 5+7 together (=160)"
+str_a4spn_pair_b5_b8: .asciz "C.ADDI4SPN nzuimm bits 5+8 together (=288)"
+str_a4spn_pair_b5_b9: .asciz "C.ADDI4SPN nzuimm bits 5+9 together (=544)"
+str_a4spn_pair_b6_b7: .asciz "C.ADDI4SPN nzuimm bits 6+7 together (=192)"
+str_a4spn_pair_b6_b8: .asciz "C.ADDI4SPN nzuimm bits 6+8 together (=320)"
+str_a4spn_pair_b6_b9: .asciz "C.ADDI4SPN nzuimm bits 6+9 together (=576)"
+str_a4spn_pair_b7_b8: .asciz "C.ADDI4SPN nzuimm bits 7+8 together (=384)"
+str_a4spn_pair_b7_b9: .asciz "C.ADDI4SPN nzuimm bits 7+9 together (=640)"
+str_a4spn_pair_b8_b9: .asciz "C.ADDI4SPN nzuimm bits 8+9 together (=768)"
+str_a4spn_sp_preserved_2: .asciz "C.ADDI4SPN sp unmodified (rd=a3, bits 2+7)"
+str_a4spn_sp_preserved_3: .asciz "C.ADDI4SPN sp unmodified (rd=a5, max)"
+str_a4spn_sp_preserved_4: .asciz "C.ADDI4SPN sp unmodified (rd=s1, alt pattern)"
 str_sw_rs2_s1: .asciz "C.SW rs2=s1(x9)"
 str_sw_rs2_a0: .asciz "C.SW rs2=a0(x10)"
 str_sw_rs2_a1: .asciz "C.SW rs2=a1(x11)"

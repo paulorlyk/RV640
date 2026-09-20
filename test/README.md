@@ -40,7 +40,7 @@ It has been built and run for real (not just hand-checked) with:
   convenient way to sanity-check the binary before trying it on real
   hardware or another simulator.
 
-Current total: **1367 result lines**, all passing.
+Current total: **1486 result lines**, all passing.
 
 ## The RVC suite
 
@@ -86,6 +86,25 @@ Every instruction gets comprehensive, edge-case-driven coverage:
   a register pre-loaded with a nonzero, distinctive upper 32 bits,
   confirming the result depends only on the low 32 bits of each
   operand, not on what else was sitting in the register.
+- **Bit independence across fields, not just within one.** Sweeping
+  one field while holding another fixed (the two bullets above) is
+  enough to catch a bug confined to a single field, but is blind to a
+  decoder fault where a bit's effect depends on what some *other*
+  field currently holds -- e.g. a wiring fault where one immediate bit
+  leaks into the logic that also selects the destination register,
+  which could easily be masked for whichever one register an
+  independent immediate sweep happens to use, while still being wrong
+  for every other one. `C.ADDI4SPN` is the current worked example: on
+  top of its independent register and immediate sweeps, it also gets a
+  genuine cross-product (every individual `nzuimm` bit crossed against
+  every legal `rd'`, 8 x 11 = 88 cases) and a within-field pairwise
+  sweep (every pair of individual bits set together, 28 cases, since
+  neither a single-bit sweep nor an "all bits" boundary case is
+  guaranteed to exercise a two-bit coupling). This is the general
+  defense against "any bit of any variable part of the instruction can
+  be corrupt [and only show up in combination with some other bit]" --
+  see `test_c_addi4spn`'s header comment in `rvc_quadrant0.S` for the
+  full reasoning. The other instructions don't have this treatment yet.
 - **Documented invariants**, e.g. "`C.ADDI4SPN` must not modify `sp`
   itself", "`C.LW`/`C.LD` are pure reads — memory and the base register
   are both unchanged afterward", or "`C.SW`/`C.SD` touch exactly the
