@@ -4,5 +4,3 @@ cmake-build-debug
 .idea
 
 dist
-
-test/build
