@@ -27,7 +27,7 @@
 			riscv,isa-extensions = "i", "m", "a", "c", "zaamo", "zicboz";
 			riscv,isa-base = "rv32i";
 			riscv,isa = "rv64imach_zaamo_zicboz";
-			riscv,cboz-block-size = <128>;
+			riscv,cboz-block-size = <64>;
 //			mmu-type = "riscv,sv57";
 			cpu0_intc: interrupt-controller {
 				#interrupt-cells = <1>;

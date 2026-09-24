@@ -18,7 +18,7 @@
 // #define CPU_STATS
 
 #define ICACHE_LINE_SIZE (128U)
-#define DCACHE_LINE_SIZE (128U)
+#define DCACHE_LINE_SIZE (64U)
 
 typedef struct {
   union {
