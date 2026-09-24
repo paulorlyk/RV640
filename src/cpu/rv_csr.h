@@ -24,7 +24,12 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
 
     case 0x301: {
       // MISA
-      return CPU_SIGN_BIT // Word size
+#ifdef CONFIG_RV64
+      const cpu_word_t mxl = CPU_SIGN_BIT;
+#else
+      const cpu_word_t mxl = CPU_SIGN_BIT >> 1;
+#endif
+      return mxl
         | MISA_EXT_BIT('a')
         | MISA_EXT_BIT('c')
         | MISA_EXT_BIT('i')
