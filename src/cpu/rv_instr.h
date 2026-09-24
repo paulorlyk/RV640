@@ -77,12 +77,22 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
 
         case 0x105: {
           // WFI
+          if(self->mode != RV_PRIV_MODE_MACHINE && self->csr.mstatus & MSTATUS_TW_MASK) {
+            _trap(self, MCAUSE_INST_ILL, false);
+            break;
+          }
+
           self->wfi = true;
           break;
         }
 
         case 0x302: {
           // MRET
+          if(self->mode == RV_PRIV_MODE_USER) {
+            _trap(self, MCAUSE_INST_ILL, false);
+            break;
+          }
+
           // Restore MIE
           self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MIE_MASK) | ((self->csr.mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0);
           // Restore privilege mode

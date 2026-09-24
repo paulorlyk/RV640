@@ -18,6 +18,12 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
   if(self->trap)
     return 0;
 
+  const RV_PrivMode csrPrivMode = (RV_PrivMode)((unsigned int)(csr >> 8) & 3);
+  if(self->mode < csrPrivMode) {
+    _trap(self, MCAUSE_INST_ILL, false);
+    return 0;
+  }
+
   switch(csr) {
     // MSTATUS
     case 0x300: return self->csr.mstatus;
@@ -89,6 +95,12 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
 static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
   if(self->trap)
     return;
+
+  const RV_PrivMode csrPrivMode = (RV_PrivMode)((unsigned int)(csr >> 8) & 3);
+  if(self->mode < csrPrivMode) {
+    _trap(self, MCAUSE_INST_ILL, false);
+    return;
+  }
 
   switch(csr) {
     case 0x300: {
