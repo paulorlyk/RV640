@@ -9,6 +9,8 @@
 
 #include "../log.h"
 
+#include "rv_internal.h"
+
 #include <assert.h>
 
 static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
@@ -85,7 +87,8 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
   switch(csr) {
     case 0x300: {
       // MSTATUS
-      self->irq = (self->csr.mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK));
+      if((self->csr.mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)))
+        _pendingIRQ(self);
       self->csr.mstatus = MSTATUS_WR_VAL(val);
       break;
     }
@@ -105,7 +108,8 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     case 0x304: {
       // MIE
       const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
-      self->irq = self->csr.mie != newMie;
+      if(self->csr.mie != newMie)
+        _pendingIRQ(self);
       self->csr.mie = newMie;
       break;
     }
@@ -151,7 +155,8 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     case 0x344: {
       // MIP
       const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
-      self->irq = self->csr.mip != newMip;
+      if(self->csr.mip != newMip)
+        _pendingIRQ(self);
       self->csr.mip = newMip;
       break;
     }

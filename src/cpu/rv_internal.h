@@ -58,4 +58,9 @@ static inline void _writeMem(RV_Cpu *self, cpu_addr_t addr, const void* buf, siz
     _trap(self, MCAUSE_ST_AF, false);
 }
 
+static inline void _pendingIRQ(RV_Cpu *self) {
+  self->irq = true;
+  self->wfi = false;
+}
+
 #endif //RV_INTERNAL_H_4B139402F2B845E4ACBE829B553A8858

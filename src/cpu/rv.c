@@ -171,8 +171,7 @@ void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n) {
 
   self->csr.mip |= mask;
 
-  self->irq = true;
-  self->wfi = false;
+  _pendingIRQ(self);
 }
 
 void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n) {
