@@ -252,4 +252,10 @@ DEFINE_MIN_FUNC(cpu_addr_t);
 DEFINE_MAX_FUNC(cpu_size_t);
 DEFINE_MIN_FUNC(cpu_size_t);
 
+DEFINE_MAX_FUNC(cpu_word_t);
+DEFINE_MIN_FUNC(cpu_word_t);
+
+DEFINE_MAX_FUNC(cpu_sword_t);
+DEFINE_MIN_FUNC(cpu_sword_t);
+
 #endif //RV_TYPES_H_3A55870B9B434441AC8E30E67683E50E

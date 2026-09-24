@@ -618,14 +618,6 @@ static inline void _doAUIPC(RV_Cpu* self, const struct _instr *di) {
 
 static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
   const size_t size = 1 << di->funct3;
-#ifdef CONFIG_RV64
-  if(size != 4 && size != 8) {
-#else
-  if(size != 4) {
-#endif
-    _doILL(self, di);
-    return;
-  }
 
   const cpu_addr_t rs1 = _readReg(self, di->rs1);
   if((rs1 & (size - 1))) {
@@ -633,13 +625,14 @@ static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
     return;
   }
 
-  const cpu_word_t rs2 = _readReg(self, di->rs2);
+  const unsigned int sizeBits = size * 8;
+  const cpu_word_t mask = CPU_UINT_MAX >> ((sizeof(cpu_word_t) * 8) - sizeBits);
+
+  const cpu_word_t rs2 = SIGN_EXTEND(_readReg(self, di->rs2) & mask, sizeBits - 1, cpu_word_t);
 
   cpu_word_t data = 0;
   _readMem(self, rs1, &data, size);
-#ifdef CONFIG_RV64
-  data = SIGN_EXTEND(data, (size * 8) - 1, cpu_word_t);
-#endif
+  data = SIGN_EXTEND(data, sizeBits - 1, cpu_word_t);
 
   bool needWrite = true;
   cpu_word_t rd = 0;
@@ -702,6 +695,34 @@ static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
       // AMOAND.x
       rd = data;
       data &= rs2;
+      break;
+    }
+
+    case 16: {
+      // AMOMIN.x
+      rd = data;
+      data = min_cpu_sword_t((cpu_sword_t)rs2, (cpu_sword_t)data);
+      break;
+    }
+
+    case 20: {
+      // AMOMAX.x
+      rd = data;
+      data = max_cpu_sword_t((cpu_sword_t)rs2, (cpu_sword_t)data);
+      break;
+    }
+
+    case 24: {
+      // AMOMINU.x
+      rd = data;
+      data = min_cpu_word_t(rs2, data);
+      break;
+    }
+
+    case 28: {
+      // AMOMAXU.x
+      rd = data;
+      data = max_cpu_word_t(rs2, data);
       break;
     }
 
