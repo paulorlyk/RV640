@@ -19,13 +19,13 @@
 
 #ifdef CONFIG_RV64
 
-#define MEM_PAGES 80
+#define MEM_PAGES 90
 
 #define MEM_PAGE_ADDR_SHIFT 12U
 
 #else
 
-#define MEM_PAGES 160
+#define MEM_PAGES 180
 
 #define MEM_PAGE_ADDR_SHIFT 11U
 
