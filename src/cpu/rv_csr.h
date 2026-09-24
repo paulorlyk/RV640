@@ -33,7 +33,8 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
         | MISA_EXT_BIT('a')
         | MISA_EXT_BIT('c')
         | MISA_EXT_BIT('i')
-        | MISA_EXT_BIT('m');
+        | MISA_EXT_BIT('m')
+        | MISA_EXT_BIT('u');
     }
 
     // MIE
