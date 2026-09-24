@@ -181,7 +181,9 @@ static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
           // CBO.ZERO
           if(!di->rd) {
             static const uint8_t zero[DCACHE_LINE_SIZE] = {0};
-            _writeMem(self, _readReg(self, di->rs1), zero, sizeof(zero));
+
+            const cpu_addr_t mask = ~((cpu_addr_t)(DCACHE_LINE_SIZE - 1));
+            _writeMem(self, _readReg(self, di->rs1) & mask, zero, sizeof(zero));
           } else {
             _doILL(self, di);
           }
