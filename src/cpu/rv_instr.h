@@ -617,7 +617,7 @@ static inline void _doAUIPC(RV_Cpu* self, const struct _instr *di) {
 }
 
 static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
-  const size_t size = 1 << di->funct3;
+  const size_t size = min_size_t(1 << di->funct3, sizeof(cpu_word_t));
 
   const cpu_addr_t rs1 = _readReg(self, di->rs1);
   if((rs1 & (size - 1))) {
