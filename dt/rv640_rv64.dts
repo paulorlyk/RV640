@@ -24,9 +24,9 @@
 			i-cache-block-size = <128>;
 			i-cache-sets = <1>;
 			i-cache-size = <128>;
-			riscv,isa-extensions = "i", "m", "a", "c", "zaamo", "zicboz";
+			riscv,isa-extensions = "i", "m", "a", "c", "zaamo", "zicboz", "zifencei", "zicsr", "zabha";
 			riscv,isa-base = "rv64i";
-			riscv,isa = "rv64imach_zaamo_zicboz";
+			riscv,isa = "rv64imac_zaamo_zicboz_zifencei_zicsr_zabha";
 			riscv,cboz-block-size = <64>;
 //			mmu-type = "riscv,sv57";
 			cpu0_intc: interrupt-controller {
