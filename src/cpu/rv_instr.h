@@ -163,12 +163,9 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
 static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
     case 1: {
-      if(!di->iimm && !di->rs1 && !di->rd) {
-        // FENCE.I
-        _flushIcache(self);
-      } else {
-        _doILL(self, di);
-      }
+      // FENCE.I
+      // di->iimm, di->rs1 and di->rd are ignored
+      _flushIcache(self);
       break;
     }
 
