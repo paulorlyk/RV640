@@ -25,10 +25,10 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     case 0x301: {
       // MISA
       return CPU_SIGN_BIT // Word size
-        | (cpu_word_t)1 << 8    // I
-        | (cpu_word_t)1 << 2    // C
-        | (cpu_word_t)1 << 0    // A
-        | (cpu_word_t)1 << 11;  // M
+        | MISA_EXT_BIT('a')
+        | MISA_EXT_BIT('c')
+        | MISA_EXT_BIT('i')
+        | MISA_EXT_BIT('m');
     }
 
     // MIE

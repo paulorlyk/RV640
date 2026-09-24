@@ -160,6 +160,8 @@ typedef enum {
   RV_PRIV_MODE_MACHINE = 3,
 } RV_PrivMode;
 
+#define MISA_EXT_BIT(letter) ((cpu_word_t)1 << ((unsigned int)(letter) - (unsigned int)'a'))
+
 #define MIE_RW_MASK  ( \
     (1ULL << (cpu_word_t)MCAUSE_SUPERVISOR_SW_INT) \
   | (1ULL << (cpu_word_t)MCAUSE_MACHINE_SW_INT) \
