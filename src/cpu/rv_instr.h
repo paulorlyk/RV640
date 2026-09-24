@@ -94,10 +94,14 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
           }
 
           // Restore MIE
-          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MIE_MASK) | ((self->csr.mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0);
+          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MIE_MASK) | ((self->csr.mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0) | MSTATUS_MPIE_MASK;
+
           // Restore privilege mode
-          self->mode = (self->csr.mstatus >> 11) & 3;
-          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | ((cpu_word_t)RV_PRIV_MODE_USER << 11);
+          self->mode = MSTATUS_GET_MPP(self->csr.mstatus);
+          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(RV_PRIV_MODE_USER);
+          if(self->mode == RV_PRIV_MODE_USER)
+            self->csr.mstatus &= ~MSTATUS_MPRV_MASK;
+
           _writePC(self, self->csr.mepc - di->size);
           break;
         }

@@ -97,7 +97,7 @@ static inline void _doTrap(RV_Cpu* self) {
   self->csr.mstatus = (self->csr.mstatus & ~(MSTATUS_MPIE_MASK | MSTATUS_MIE_MASK)) | ((self->csr.mstatus & MSTATUS_MIE_MASK) ? MSTATUS_MPIE_MASK : 0);
 
   // Save privilege mode
-  self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | (cpu_word_t)self->mode << 11;
+  self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(self->mode);
 
   self->mode = RV_PRIV_MODE_MACHINE;
 
