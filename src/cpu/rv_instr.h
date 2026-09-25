@@ -176,9 +176,12 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
 
 static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
   switch(di->funct3) {
+    // FENCE
+    // di->rs1 and di->rd are ignored
+    case 0:
+    // FENCE.I
+    // di->iimm, di->rs1 and di->rd are ignored
     case 1: {
-      // FENCE.I
-      // di->iimm, di->rs1 and di->rd are ignored
       _flushIcache(self);
       break;
     }
@@ -213,7 +216,7 @@ static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
     }
 
     default: {
-      // _doILL(self, di);
+      _doILL(self, di);
       break;
     }
   }
