@@ -105,9 +105,14 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
   switch(csr) {
     case 0x300: {
       // MSTATUS
-      if((self->csr.mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)))
+      if((self->csr.mstatus & MSTATUS_MIE_MASK) != (val & MSTATUS_MIE_MASK))
         _pendingIRQ(self);
-      self->csr.mstatus = MSTATUS_WR_VAL(val);
+
+      RV_PrivMode mpp = MSTATUS_GET_MPP(val);
+      if(mpp != RV_PRIV_MODE_USER)
+        mpp = RV_PRIV_MODE_MACHINE;
+
+      self->csr.mstatus = (MSTATUS_WR_VAL(val) & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(mpp);
       break;
     }
 
@@ -128,6 +133,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
       const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
       if(self->csr.mie != newMie)
         _pendingIRQ(self);
+
       self->csr.mie = newMie;
       break;
     }
@@ -175,6 +181,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
       const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
       if(self->csr.mip != newMip)
         _pendingIRQ(self);
+
       self->csr.mip = newMip;
       break;
     }
