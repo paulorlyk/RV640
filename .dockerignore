@@ -1,9 +1,7 @@
 .idea
 .git
 
-buildroot
-!buildroot/configs
-!buildroot/rootfs-overlay
+buildroot/buildroot*
 
 dist
 

@@ -64,6 +64,8 @@ COPY buildroot/ .
 
 RUN cp configs/.config buildroot/
 
+RUN cd buildroot/linux && git apply ../../linux.mk.patch
+
 WORKDIR /build/buildroot
 
 RUN make oldconfig && make

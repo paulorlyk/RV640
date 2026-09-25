@@ -1,0 +1,11 @@
+--- linux.mk1	2026-09-22 06:10:22.687179056 +0200
++++ linux.mk	2026-09-22 06:10:12.164279048 +0200
+@@ -152,6 +152,8 @@
+ LINUX_EXTRA_DOWNLOADS += $(ARCH_XTENSA_OVERLAY_URL)
+ endif
+ 
++LINUX_CFLAGS += -O3
++
+ # We don't want to run depmod after installing the kernel. It's done in a
+ # target-finalize hook, to encompass modules installed by packages.
+ # Disable building host tools with -Werror: newer gcc versions can be
