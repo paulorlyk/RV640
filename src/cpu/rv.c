@@ -23,15 +23,23 @@ static inline void _processPendingInterrupts(RV_Cpu *self) {
     // MCAUSE_SUPERVISOR_TMR_INT,
     // MCAUSE_CTR_OVF_INT,
   };
+  static const cpu_word_t masks[] = {
+    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_EXT_INT,
+    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_SW_INT,
+    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_TMR_INT,
+    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT,
+    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_SW_INT,
+    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT,
+    // (cpu_word_t)1 << (unsigned int)MCAUSE_CTR_OVF_INT,
+  };
 
-  if(!(self->csr.mstatus & MSTATUS_MIE_MASK))
+  if(self->mode == RV_PRIV_MODE_MACHINE && (self->csr.mstatus & MSTATUS_MIE_MASK) == 0)
     return;
 
   const cpu_word_t interrupts = self->csr.mip & self->csr.mie;
   if(interrupts) {
     for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
-      const cpu_word_t mask = 1ULL << vectors[i];
-      if(interrupts & mask) {
+      if(interrupts & masks[i]) {
         _trap(self, vectors[i], true);
         break;
       }
