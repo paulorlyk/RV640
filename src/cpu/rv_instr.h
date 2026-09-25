@@ -194,6 +194,11 @@ static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
         case 4: {
           // CBO.ZERO
           if(!di->rd) {
+            if(self->mode < RV_PRIV_MODE_MACHINE && (self->csr.menvcfg & MENVCFG_CBZE_MASK) == 0) {
+              _trap(self, MCAUSE_INST_ILL, false);
+              break;
+            }
+
             static const uint8_t zero[DCACHE_LINE_SIZE] = {0};
 
             const cpu_addr_t mask = ~((cpu_addr_t)(DCACHE_LINE_SIZE - 1));

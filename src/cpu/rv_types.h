@@ -249,6 +249,8 @@ typedef enum {
 #define MSTATUS_MPP(mode) (((cpu_word_t)(mode) & 3U) << 11)
 #define MSTATUS_GET_MPP(mstatus) ((RV_PrivMode)(((mstatus) >> 11) & 3))
 
+#define MENVCFG_CBZE_MASK (((cpu_word_t)1) << 7)
+
 DEFINE_MAX_FUNC(cpu_addr_t);
 DEFINE_MIN_FUNC(cpu_addr_t);
 

@@ -135,6 +135,8 @@ void rv_reset(RV_Cpu *self, cpu_addr_t start) {
   self->csr.mstatush = MSTATUSH_WR_VAL(0U);
 #endif
 
+  self->csr.menvcfg = MENVCFG_CBZE_MASK;
+
   self->irq = false;
 
   self->trap = false;
