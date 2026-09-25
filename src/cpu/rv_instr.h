@@ -117,9 +117,10 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
     case 1: {
       // CSRRW
       const cpu_word_t data = _readReg(self, di->rs1);
-      if(di->rd)
-        _writeReg(self, di->rd, _readCSR(self, di->iimm));
+      const cpu_word_t csr = _readCSR(self, di->iimm);
       _writeCSR(self, di->iimm, data);
+      if(di->rd)
+        _writeReg(self, di->rd, csr);
       break;
     }
 
@@ -127,9 +128,9 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
       // CSRRS
       const cpu_word_t data = _readReg(self, di->rs1);
       const cpu_word_t csr = _readCSR(self, di->iimm);
-      _writeReg(self, di->rd, csr);
       if(di->rs1)
         _writeCSR(self, di->iimm, csr | data);
+      _writeReg(self, di->rd, csr);
       break;
     }
 
@@ -137,33 +138,36 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
       // CSRRC
       const cpu_word_t data = _readReg(self, di->rs1);
       const cpu_word_t csr = _readCSR(self, di->iimm);
-      _writeReg(self, di->rd, csr);
       if(di->rs1)
         _writeCSR(self, di->iimm, csr & ~data);
+      _writeReg(self, di->rd, csr);
       break;
     }
 
     case 5: {
       // CSRRWI
-      if(di->rd)
-        _writeReg(self, di->rd, _readCSR(self, di->iimm));
+      const cpu_word_t csr = _readCSR(self, di->iimm);
       _writeCSR(self, di->iimm, di->rs1);
+      if(di->rd)
+        _writeReg(self, di->rd, csr);
       break;
     }
 
     case 6: {
       // CSRRSI
       const cpu_word_t csr = _readCSR(self, di->iimm);
+      if(di->rs1)
+        _writeCSR(self, di->iimm, csr | di->rs1);
       _writeReg(self, di->rd, csr);
-      _writeCSR(self, di->iimm, csr | di->rs1);
       break;
     }
 
     case 7: {
       // CSRRCI
       const cpu_word_t csr = _readCSR(self, di->iimm);
+      if(di->rs1)
+        _writeCSR(self, di->iimm, csr & ~(cpu_word_t)di->rs1);
       _writeReg(self, di->rd, csr);
-      _writeCSR(self, di->iimm, csr & ~(cpu_word_t)di->rs1);
       break;
     }
 

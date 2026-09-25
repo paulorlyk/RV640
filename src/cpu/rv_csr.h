@@ -84,7 +84,6 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
 
     default: {
       _trap(self, MCAUSE_INST_ILL, false);
-      assert(false);
       break;
     }
   }
@@ -118,14 +117,6 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     // MISA
     case 0x301:
-    // MVENDORID
-    case 0xF11:
-    // MARCHID
-    case 0xF12:
-    // MAIMPID
-    case 0xF13:
-    // MHARTID
-    case 0xF14:
       break;
 
     case 0x304: {
@@ -187,7 +178,6 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     }
 
     default: {
-      WARN("Writing unknown CSR: %x", csr);
       _trap(self, MCAUSE_INST_ILL, false);
       break;
     }
