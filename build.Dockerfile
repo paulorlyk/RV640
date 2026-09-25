@@ -74,9 +74,11 @@ RUN make oldconfig && make
 FROM scratch AS dist
 
 COPY --from=build-rv640 /rv640/build/cmake/dos/RV640.exe      /dos/
-COPY --from=build-rv640 /rv640/build/cmake/dos/rv640.dtb      /dos/
+COPY --from=build-rv640 /rv640/build/cmake/dos/rv640_rv32.dtb /dos/
+#COPY --from=build-rv640 /rv640/build/cmake/dos/rv640_rv64.dtb /dos/
 
-COPY --from=build-rv640 /rv640/build/cmake/linux/RV640        /linux/
-COPY --from=build-rv640 /rv640/build/cmake/linux/rv640.dtb    /linux/
+COPY --from=build-rv640 /rv640/build/cmake/linux/RV640          /linux/
+COPY --from=build-rv640 /rv640/build/cmake/linux/rv640_rv32.dtb /linux/
+#COPY --from=build-rv640 /rv640/build/cmake/linux/rv640_rv64.dtb /linux/
 
 COPY --from=build-linux /build/buildroot/output/images/Image  /
