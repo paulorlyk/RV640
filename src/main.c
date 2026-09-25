@@ -274,8 +274,8 @@ int main(int argc, char* argv[]) {
 
   INFO("Resetting the CPU...");
   rv_reset(&_vm.cpu, kernelEntryPoint);
-  rv_setRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
-  rv_setRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
+  rv_pokeRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
+  rv_pokeRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
 
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
@@ -335,7 +335,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef MAX_CYCLES
   putc('\n', stderr);
-  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv_getPC(&_vm.cpu));
+  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv_peekPC(&_vm.cpu));
 #endif
 
   _vmDestroy();

@@ -204,7 +204,7 @@ static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
 
             static const uint8_t zero[DCACHE_LINE_SIZE] = {0};
 
-            const cpu_addr_t mask = ~((cpu_addr_t)(DCACHE_LINE_SIZE - 1));
+            const cpu_addr_t mask = ~(cpu_addr_t)(DCACHE_LINE_SIZE - 1);
             _writeMem(self, _readReg(self, di->rs1) & mask, zero, sizeof(zero));
           } else {
             _doILL(self, di);

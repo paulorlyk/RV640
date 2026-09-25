@@ -17,8 +17,9 @@
 
 // #define CPU_STATS
 
-#define ICACHE_LINE_SIZE (128U)
-#define DCACHE_LINE_SIZE (64U)
+#define ICACHE_LINE_SIZE 128
+
+#define DCACHE_LINE_SIZE 64
 
 typedef struct {
   union {
@@ -98,11 +99,12 @@ typedef struct {
 bool rv_init(RV_Cpu* self, Bus *bus);
 void rv_destroy(RV_Cpu *self);
 
-#define rv_getPC(self) ((self)->PC)
-#define rv_getRx(self, rx) ((self)->regs.Rx[(rx)])
+#define rv_peekPC(self) (*(const cpu_addr_t *)&(self)->PC)
+
+#define rv_peekRx(self, rx) (*(const cpu_word_t *)&(self)->regs.Rx[(rx)])
+#define rv_pokeRx(self, rx, val) ((self)->regs.Rx[(rx)] = (val))
 
 #define rv_isWFI(self) (!!((self)->wfi))
-#define rv_setRx(self, rx, val) ((self)->regs.Rx[(rx)] = (val))
 
 void rv_reset(RV_Cpu *self, cpu_addr_t start);
 
