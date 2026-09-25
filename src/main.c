@@ -18,15 +18,18 @@
 #include <string.h>
 #include <time.h>
 
-// #define MAX_CYCLES 1000000
+// #define MAX_CYCLES 3000000
+
+#define RAM_BASE 0x80000000
 
 static struct {
   const char *dtbFile;
   const char *kernelFile;
+  const char *binFile;
 #ifdef CONFIG_DOS
   const char *swapFile;
 #endif
-} _opts;
+} _opts = {};
 
 static struct {
   Bus bus;
@@ -35,7 +38,7 @@ static struct {
   Aclint aclint;
   Plic plic;
   Ns16550a uart0;
-} _vm;
+} _vm = {};
 
 static cpu_addr_t _loadDTB(const char* fileName, Memory *mem, cpu_addr_t memBase) {
   INFO("Reading DTB from %s", fileName);
@@ -138,16 +141,53 @@ static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t 
   return text_offset + memBase;
 }
 
+static cpu_addr_t _loadBin(const char* fileName, Memory *mem, cpu_addr_t memBase) {
+  INFO("Reading binary image from %s", fileName);
+
+  FILE *f = fopen(fileName, "rb");
+  if(!f) {
+    ERROR("Unable to open binary image file %s", fileName);
+    return 0;
+  }
+
+  INFO("Loading BIN to 0x%" PRI_CPU_PTR, memBase);
+
+  const size_t bufSize = 512 * sizeof(cpu_word_t);
+  uint8_t *buf = malloc(bufSize);
+  if(!buf) {
+    ERROR("Failed to allocate read buffer");
+    return 0;
+  }
+
+  cpu_addr_t ptr = 0;
+  for(int n = 0; !feof(f); ++n) {
+    const size_t read = fread(buf, 1, bufSize, f);
+
+    mem_write(mem, ptr, buf, read);
+    ptr += read;
+
+    if((n % 256) == 0)
+      INFO("Binary image: %" PRI_CPU_SIZE " bytes", ptr);
+  }
+
+  free(buf);
+
+  fclose(f);
+
+  return memBase;
+}
+
 static bool _parseArgs(int argc, char* argv[]) {
   static const struct option options[] = {
-    { .name = "dtb",    .has_arg = required_argument, .flag = 0, .val = 'd'},
-    { .name = "kernel", .has_arg = required_argument, .flag = 0, .val = 'k'},
+    { .name = "dtb",    .has_arg = required_argument, .flag = 0, .val = 'd' },
+    { .name = "kernel", .has_arg = required_argument, .flag = 0, .val = 'k' },
+    { .name = "bin",    .has_arg = required_argument, .flag = 0, .val = 'b' },
 #ifdef CONFIG_DOS
-    { .name = "swap", .has_arg = required_argument,   .flag = 0, .val = 's' },
+    { .name = "swap",   .has_arg = required_argument, .flag = 0, .val = 's' },
 #endif
     {0},
   };
-  for(int opt; (opt = getopt_long(argc, argv, "d:k:s:", options, NULL)) != -1;) {
+  for(int opt; (opt = getopt_long(argc, argv, "d:k:b:s:", options, NULL)) != -1;) {
     switch(opt) {
       case 'd': {
         _opts.dtbFile = optarg;
@@ -156,6 +196,11 @@ static bool _parseArgs(int argc, char* argv[]) {
 
       case 'k': {
         _opts.kernelFile = optarg;
+        break;
+      }
+
+      case 'b': {
+        _opts.binFile = optarg;
         break;
       }
 
@@ -172,29 +217,40 @@ static bool _parseArgs(int argc, char* argv[]) {
     }
   }
 
-  if(
-    !_opts.dtbFile
-    || !_opts.kernelFile
-#ifdef CONFIG_DOS
-    || !_opts.swapFile
-#endif
-    ) {
-    ERROR("Missing file argument");
+  if(_opts.kernelFile) {
+    if(!_opts.dtbFile) {
+      ERROR("--dtb is required");
+      return false;
+    }
+
+    if(_opts.binFile) {
+      ERROR("Either --kernel or --bin, not both");
+      return false;
+    }
+  } else if(!_opts.binFile) {
+    ERROR("Either --kernel or --bin is required");
     return false;
   }
+
+#ifdef CONFIG_DOS
+  if(!_opts.swapFile) {
+    ERROR("--swap is required");
+    return false;
+  }
+#endif
 
   return true;
 }
 
 static void _usage(const char* exe) {
-  INFO("Usage: %s\n"
-    "    -d|--dtb file.dtb\n"
-    "    -k|--kernel Image\n"
+  INFO("Usage: %s [OPTIONS]", exe);
+  INFO("Options:");
+  INFO("    -d|--dtb file.dtb - device tree");
+  INFO("    -k|--kernel Image - kernel image");
+  INFO("    -b|--bin image.bin - binary image. Loaded to 0x%" PRI_CPU_PTR, (cpu_addr_t)RAM_BASE);
 #ifdef CONFIG_DOS
-    "    -s|--swap ram.swp\n"
+  INFO("    -s|--swap ram.swp - location of the swap file");
 #endif
-    "",
-    exe);
 }
 
 static void _vmDestroy() {
@@ -238,21 +294,27 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  const cpu_addr_t ramBase = 0x80000000;
+  cpu_addr_t entryPoint = 0;
+  if(_opts.kernelFile) {
+    const cpu_addr_t dtbAddress = _loadDTB(_opts.dtbFile, &_vm.ram, RAM_BASE);
+    if(!dtbAddress) {
+      _vmDestroy();
+      return 1;
+    }
 
-  const cpu_addr_t dtbAddress = _loadDTB(_opts.dtbFile, &_vm.ram, ramBase);
-  if(!dtbAddress) {
+    entryPoint = _loadLinuxImage(_opts.kernelFile, &_vm.ram, RAM_BASE);
+
+    rv_pokeRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
+    rv_pokeRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
+  } else {
+    entryPoint = _loadBin(_opts.binFile, &_vm.ram, RAM_BASE);
+  }
+  if(!entryPoint) {
     _vmDestroy();
     return 1;
   }
 
-  const cpu_addr_t kernelEntryPoint = _loadLinuxImage(_opts.kernelFile, &_vm.ram, ramBase);
-  if(!kernelEntryPoint) {
-    _vmDestroy();
-    return 1;
-  }
-
-  if(!bus_register(&_vm.bus, ramBase, mem_device(&_vm.ram))) {
+  if(!bus_register(&_vm.bus, RAM_BASE, mem_device(&_vm.ram))) {
     _vmDestroy();
     return 1;
   }
@@ -273,9 +335,7 @@ int main(int argc, char* argv[]) {
   }
 
   INFO("Resetting the CPU...");
-  rv_reset(&_vm.cpu, kernelEntryPoint);
-  rv_pokeRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
-  rv_pokeRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
+  rv_reset(&_vm.cpu, entryPoint);
 
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
