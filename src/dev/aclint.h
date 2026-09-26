@@ -38,7 +38,7 @@ void aclint_destroy(Aclint *self);
 
 void aclint_tick(Aclint *self, unsigned int cycles);
 
-#define aclint_mtime(self) ((self)->mtimer.mtime)
+#define aclint_mtime(self) (*(const uint64_t *)&(self)->mtimer.mtime)
 
 uint64_t aclint_mtimeRemains(Aclint *self, int hart);
 

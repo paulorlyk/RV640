@@ -337,18 +337,18 @@ int main(int argc, char* argv[]) {
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
 
+#ifdef MAX_CYCLES
+  const clock_t tsStart = ts;
+#endif
+
   ui_cps(0);
   ui_time(runtime_ms);
   ui_idle(false);
 
   for(long int cyclesAcc = 0;;) {
 #ifdef MAX_CYCLES
-    if(aclint_mtime(&_vm.aclint) >= MAX_CYCLES) {
-      const clock_t now = clock();
-      const clock_t dur = now - ts;
-      runtime_ms += dur / (CLOCKS_PER_SEC / 1000);
+    if(aclint_mtime(&_vm.aclint) >= MAX_CYCLES)
       break;
-    }
 #endif
 
     const int cyclesPerStep = 100;
@@ -391,8 +391,11 @@ int main(int argc, char* argv[]) {
   }
 
 #ifdef MAX_CYCLES
+  const clock_t dur = clock() - tsStart;
+  const unsigned long duration_ms = dur / (CLOCKS_PER_SEC / 1000);
+
   putc('\n', stderr);
-  DEBUG("CPU executed %" PRIu64 " cycles in %lld.%03lld sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), runtime_ms / 1000ULL, runtime_ms % 1000ULL, rv_peekPC(&_vm.cpu));
+  DEBUG("CPU executed %" PRIu64 " cycles in %lu.%03lu sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), duration_ms / 1000UL, duration_ms % 1000UL, rv_peekPC(&_vm.cpu));
 #endif
 
   _vmDestroy();
