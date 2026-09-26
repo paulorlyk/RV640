@@ -13,7 +13,7 @@
 #include <stdio.h>
 
 static inline bool _includes(cpu_addr_t base, cpu_size_t size, cpu_addr_t a, cpu_size_t s) {
-  return (a >= base) && ((a + (s - 1)) <= (base + size));
+  return (a >= base) && ((a + s) <= (base + size));
 }
 
 static inline struct _busDevice *_findDevice(Bus *self, cpu_addr_t addr, size_t size, cpu_addr_t *devAddr) {
