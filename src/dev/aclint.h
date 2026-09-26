@@ -33,6 +33,7 @@ bool aclint_init(Aclint* self, RV_Cpu* harts[ACLINT_HARTS]);
 
 void aclint_destroy(Aclint *self);
 
+#define aclint_size(self) (*(const cpu_size_t *)&(self)->dev.size)
 #define aclint_device(self) (&(self)->dev)
 
 void aclint_tick(Aclint *self, unsigned int cycles);

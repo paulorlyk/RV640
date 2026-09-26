@@ -5,6 +5,7 @@
 
 #include "bus.h"
 #include "memory.h"
+#include "device_tree.h"
 #include "cpu/rv.h"
 #include "dev/ns16550a.h"
 #include "dev/plic.h"
@@ -20,10 +21,12 @@
 
 // #define MAX_CYCLES 3000000
 
-#define RAM_BASE 0x80000000
+#define RAM_BASE      0x80000000
+#define ACLINT_BASE   0x2000000
+#define PLIC_BASE     0xC000000
+#define UART_BASE     0x10000000
 
 static struct {
-  const char *dtbFile;
   const char *kernelFile;
   const char *binFile;
 #ifdef CONFIG_DOS
@@ -40,42 +43,48 @@ static struct {
   Ns16550a uart0;
 } _vm = {};
 
-static cpu_addr_t _loadDTB(const char* fileName, Memory *mem, cpu_addr_t memBase) {
-  INFO("Reading DTB from %s", fileName);
+static cpu_addr_t _buildDeviceTree() {
+  DeviceTree dt;
 
-  FILE *f = fopen(fileName, "rb");
-  if(!f) {
-    ERROR("Unable to open DTB file %s", fileName);
+  INFO("Building device tree...");
+  if(!dt_init(&dt))
+    return 0;
+
+  if(!dt_addMemeory(&dt, RAM_BASE, mem_size(&_vm.ram))) {
+    dt_destroy(&dt);
     return 0;
   }
 
-  fseek(f, 0, SEEK_END);
-  const long int dtbSize = ftell(f);
-  fseek(f, 0, SEEK_SET);
-
-  const cpu_addr_t dtbOffset = ALIGN_DOWN(mem_size(mem) - dtbSize, sizeof(cpu_word_t));
-
-  INFO("Loading DTB to 0x%" PRI_CPU_PTR ", size = %ld", dtbOffset + memBase, dtbSize);
-
-  const size_t bufSize = 512 * sizeof(cpu_word_t);
-  uint8_t *buf = malloc(bufSize);
-  if(!buf) {
-    ERROR("Failed to allocate read buffer");
+  if(!dt_addAclint(&dt, ACLINT_BASE, aclint_size(&_vm.aclint))) {
+    dt_destroy(&dt);
     return 0;
   }
 
-  for(cpu_addr_t dtbPtr = dtbOffset; !feof(f);) {
-    const size_t read = fread(buf, 1, bufSize, f);
-
-    mem_write(mem, dtbPtr, buf, read);
-    dtbPtr += read;
+  if(!dt_addPlic(&dt, PLIC_BASE, plic_size(&_vm.plic), PLIC_INTERRUPTS)) {
+    dt_destroy(&dt);
+    return 0;
   }
 
-  free(buf);
+  if(!dt_addNs16550a(&dt, UART_BASE, ns16550_size(&_vm.uart0), NS16550A_IRQ)) {
+    dt_destroy(&dt);
+    return 0;
+  }
 
-  fclose(f);
+  if(!dt_finish(&dt)) {
+    dt_destroy(&dt);
+    return 0;
+  }
 
-  return dtbOffset + memBase;
+  const cpu_size_t dtbSize = dt_size(&dt);
+  const cpu_addr_t dtbAddress = ALIGN_DOWN(mem_size(&_vm.ram) + RAM_BASE - dtbSize, sizeof(cpu_addr_t));
+
+  INFO("Loading device tree to 0x%" PRI_CPU_PTR " size = %" PRI_CPU_SIZE, dtbAddress, dtbSize);
+
+  bus_write(&_vm.bus, dtbAddress, dt_data(&dt), dtbSize);
+
+  dt_destroy(&dt);
+
+  return dtbAddress;
 }
 
 static cpu_addr_t _loadLinuxImage(const char* fileName, Memory* mem, cpu_addr_t memBase) {
@@ -179,7 +188,6 @@ static cpu_addr_t _loadBin(const char* fileName, Memory *mem, cpu_addr_t memBase
 
 static bool _parseArgs(int argc, char* argv[]) {
   static const struct option options[] = {
-    { .name = "dtb",    .has_arg = required_argument, .flag = 0, .val = 'd' },
     { .name = "kernel", .has_arg = required_argument, .flag = 0, .val = 'k' },
     { .name = "bin",    .has_arg = required_argument, .flag = 0, .val = 'b' },
 #ifdef CONFIG_DOS
@@ -187,13 +195,8 @@ static bool _parseArgs(int argc, char* argv[]) {
 #endif
     {0},
   };
-  for(int opt; (opt = getopt_long(argc, argv, "d:k:b:s:", options, NULL)) != -1;) {
+  for(int opt; (opt = getopt_long(argc, argv, "k:b:s:", options, NULL)) != -1;) {
     switch(opt) {
-      case 'd': {
-        _opts.dtbFile = optarg;
-        break;
-      }
-
       case 'k': {
         _opts.kernelFile = optarg;
         break;
@@ -218,11 +221,6 @@ static bool _parseArgs(int argc, char* argv[]) {
   }
 
   if(_opts.kernelFile) {
-    if(!_opts.dtbFile) {
-      ERROR("--dtb is required");
-      return false;
-    }
-
     if(_opts.binFile) {
       ERROR("Either --kernel or --bin, not both");
       return false;
@@ -245,7 +243,6 @@ static bool _parseArgs(int argc, char* argv[]) {
 static void _usage(const char* exe) {
   INFO("Usage: %s [OPTIONS]", exe);
   INFO("Options:");
-  INFO("    -d|--dtb file.dtb - device tree");
   INFO("    -k|--kernel Image - kernel image");
   INFO("    -b|--bin image.bin - binary image. Loaded to 0x%" PRI_CPU_PTR, (cpu_addr_t)RAM_BASE);
 #ifdef CONFIG_DOS
@@ -294,9 +291,29 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if(!bus_register(&_vm.bus, RAM_BASE, mem_device(&_vm.ram))) {
+    _vmDestroy();
+    return 1;
+  }
+
+  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, ACLINT_BASE, aclint_device(&_vm.aclint))) {
+    _vmDestroy();
+    return 1;
+  }
+
+  if(!plic_init(&_vm.plic, harts) || !bus_register(&_vm.bus, PLIC_BASE, plic_device(&_vm.plic))) {
+    _vmDestroy();
+    return 1;
+  }
+
+  if(!ns16550a_init(&_vm.uart0, &_vm.plic) || !bus_register(&_vm.bus, UART_BASE, ns16550_device(&_vm.uart0))) {
+    _vmDestroy();
+    return 1;
+  }
+
   cpu_addr_t entryPoint = 0;
   if(_opts.kernelFile) {
-    const cpu_addr_t dtbAddress = _loadDTB(_opts.dtbFile, &_vm.ram, RAM_BASE);
+    const cpu_addr_t dtbAddress = _buildDeviceTree();
     if(!dtbAddress) {
       _vmDestroy();
       return 1;
@@ -310,26 +327,6 @@ int main(int argc, char* argv[]) {
     entryPoint = _loadBin(_opts.binFile, &_vm.ram, RAM_BASE);
   }
   if(!entryPoint) {
-    _vmDestroy();
-    return 1;
-  }
-
-  if(!bus_register(&_vm.bus, RAM_BASE, mem_device(&_vm.ram))) {
-    _vmDestroy();
-    return 1;
-  }
-
-  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, 0x2000000, aclint_device(&_vm.aclint))) {
-    _vmDestroy();
-    return 1;
-  }
-
-  if(!plic_init(&_vm.plic, harts) || !bus_register(&_vm.bus, 0xC000000, plic_device(&_vm.plic))) {
-    _vmDestroy();
-    return 1;
-  }
-
-  if(!ns16550a_init(&_vm.uart0, &_vm.plic) || !bus_register(&_vm.bus, 0x10000000, ns16550_device(&_vm.uart0))) {
     _vmDestroy();
     return 1;
   }

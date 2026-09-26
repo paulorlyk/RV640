@@ -13,6 +13,11 @@ add_executable(${EXECUTABLE_8086}
     ${SOURCES}
 )
 
+target_include_directories(${EXECUTABLE_8086} PRIVATE
+    ${INCLUDE_DIRS}
+    "/usr/ia16-elf/include"
+)
+
 target_compile_options(${EXECUTABLE_8086} PRIVATE
     "-Wall"
 
@@ -35,10 +40,6 @@ target_compile_options(${EXECUTABLE_8086} PRIVATE
 #    "-S"
 )
 
-target_include_directories(${EXECUTABLE_8086} PRIVATE
-    "/usr/ia16-elf/include"
-)
-
 target_link_libraries(${EXECUTABLE_8086} PRIVATE
     "i86"
 )
@@ -50,18 +51,8 @@ target_link_options(${EXECUTABLE_8086} PRIVATE
 )
 
 target_compile_definitions(${EXECUTABLE_8086} PRIVATE
-#    NDEBUG
     CONFIG_DOS=1
 #    CONFIG_RV64=1
 #    CONFIG_RV64_32BIT_ADDR=1
-)
-
-add_custom_command(TARGET ${EXECUTABLE_8086} POST_BUILD
-    COMMAND dtc -o rv640_rv32.dtb ${CMAKE_CURRENT_SOURCE_DIR}/../../dt/rv640_rv32.dts
-    VERBATIM
-)
-
-add_custom_command(TARGET ${EXECUTABLE_8086} POST_BUILD
-    COMMAND dtc -o rv640_rv64.dtb ${CMAKE_CURRENT_SOURCE_DIR}/../../dt/rv640_rv64.dts
-    VERBATIM
+    FDT_ASSUME_MASK=ASSUME_PERFECT
 )

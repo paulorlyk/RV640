@@ -37,6 +37,7 @@ bool plic_init(Plic* self, RV_Cpu* harts[PLIC_HARTS]);
 
 void plic_destroy(Plic *self);
 
+#define plic_size(self) (*(const cpu_size_t *)&(self)->dev.size)
 #define plic_device(self) (&(self)->dev)
 
 void plic_interrupt(Plic *self, unsigned int n);

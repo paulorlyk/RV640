@@ -75,7 +75,7 @@ bool mem_init(Memory* self, cpu_size_t size);
 
 void mem_destroy(Memory *self);
 
-#define mem_size(self) ((self)->dev.size)
+#define mem_size(self) (*(const cpu_size_t *)&(self)->dev.size)
 #define mem_device(self) (&(self)->dev)
 
 void mem_read(Memory *self, cpu_addr_t addr, void* buf, size_t size);

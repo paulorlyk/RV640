@@ -35,17 +35,17 @@ In the guest OS - login as `root` with no password.
 ### Linux
 ```bash
 cd linux
-./RV640 --dtb rv640.dtb --kernel ../Image
+./RV640 --kernel ../Image
 ```
 
 ### DOS
 ```bash
 cd dos
-RV640 --swap ram.swp --dtb rv640.dtb --kernel ../Image
+RV640 --swap ram.swp --kernel ../Image
 ```
 Swap file contains the entire RAM of the guest VM. It will be created/resized automatically. The faster the underlying storage - the better.
 
-RV64 VM executes 200-250 IPS on average on 8086 @ 4.77MHz. Be prepared to wait for several days for a login prompt.
+RV64 VM executes 750-1000 IPS on average on 8086 @ 4.77MHz. Be prepared to wait for several days for a login prompt.
 The experience is not very interactive. There will be a (extremely) delayed feedback while typing.
 Emulator has a 256 byte input buffer, so just blindly type your command and return in several hours...
 
@@ -54,5 +54,9 @@ Emulator has a 256 byte input buffer, so just blindly type your command and retu
 ## Acknowledgements
 
 The idea came after reading this article:
-[Linux on an 8-bit micro?
-](https://dmitry.gr/?r=05.Projects&proj=07.%20Linux%20on%208bit)
+[Linux on an 8-bit micro?](https://dmitry.gr/?r=05.Projects&proj=07.%20Linux%20on%208bit)
+
+
+This project includes libfdt from the Device Tree Compiler project.
+libfdt is distributed under its applicable open-source license.
+See third_party/dtc/libfdt/README.license for the license terms.

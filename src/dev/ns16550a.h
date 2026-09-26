@@ -51,6 +51,7 @@ bool ns16550a_init(Ns16550a* self, Plic* plic);
 
 void ns16550a_destroy(Ns16550a *self);
 
+#define ns16550_size(self) (*(const cpu_size_t *)&(self)->dev.size)
 #define ns16550_device(self) (&(self)->dev)
 
 bool ns16550_push(Ns16550a *self, char ch);
