@@ -59,6 +59,10 @@ static inline uint32_t _fetch(RV_Cpu *self) {
 
   cpu_addr_t offset = pc - self->icache.base;
   if(self->icache.base == CPU_ADDR_MAX || offset > (ICACHE_LINE_SIZE - sizeof(res))) {
+#ifdef CPU_STATS
+    ++self->icacheMisses;
+#endif
+
     if(!bus_read(self->bus, pc, self->icache.line, ICACHE_LINE_SIZE)) {
       // Very end of the memory, less than a cache line size
       if(!bus_read(self->bus, pc, &res, sizeof(res))) {
@@ -73,10 +77,6 @@ static inline uint32_t _fetch(RV_Cpu *self) {
 
     // Cache line loaded, we are at the start of the cache line
     offset = 0;
-
-#ifdef CPU_STATS
-    ++self->icacheMisses;
-#endif
   } else {
 #ifdef CPU_STATS
     ++self->icacheHits;

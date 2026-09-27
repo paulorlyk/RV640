@@ -7,6 +7,14 @@
 
 #include "rv.h"
 
+#ifndef CONFIG_DOS
+#include <stdlib.h>
+#include <ctype.h>
+
+extern bool _trace;
+extern uint64_t _cycle;
+#endif
+
 static inline void _flushIcache(RV_Cpu *self) {
   self->icache.base = CPU_ADDR_MAX;
 }
