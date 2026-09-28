@@ -6,6 +6,7 @@
 #include "bus.h"
 #include "memory.h"
 #include "device_tree.h"
+#include "sbi.h"
 #include "cpu/rv.h"
 #include "dev/ns16550a.h"
 #include "dev/plic.h"
@@ -32,6 +33,7 @@ static struct {
 #ifdef CONFIG_DOS
   const char *swapFile;
 #endif
+  bool noSBI;
 } _opts = {};
 
 static struct {
@@ -193,6 +195,7 @@ static bool _parseArgs(int argc, char* argv[]) {
 #ifdef CONFIG_DOS
     { .name = "swap",   .has_arg = required_argument, .flag = 0, .val = 's' },
 #endif
+    { .name = "no-sbi", .has_arg = no_argument,       .flag = 0, .val = 1000 },
     {0},
   };
   for(int opt; (opt = getopt_long(argc, argv, "k:b:s:", options, NULL)) != -1;) {
@@ -213,6 +216,11 @@ static bool _parseArgs(int argc, char* argv[]) {
         break;
       }
 #endif
+
+      case 1000: {
+        _opts.noSBI = true;
+        break;
+      }
 
       default:
         ERROR("Unknown argument");
@@ -248,6 +256,7 @@ static void _usage(const char* exe) {
 #ifdef CONFIG_DOS
   INFO("    -s|--swap ram.swp - location of the swap file");
 #endif
+  INFO("    --no-sbi - disable SBI, kernel runs in M-mode");
 }
 
 static void _vmDestroy() {
@@ -275,12 +284,18 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(!rv_init(&_vm.cpu, &_vm.bus)) {
+  static RV_Cpu *harts[] = { &_vm.cpu };
+
+  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, ACLINT_BASE, aclint_device(&_vm.aclint))) {
     _vmDestroy();
     return 1;
   }
 
-  static RV_Cpu *harts[] = { &_vm.cpu };
+  if(!rv_init(&_vm.cpu, &_vm.bus, &_vm.aclint, 0, !_opts.noSBI)) {
+    _vmDestroy();
+    return 1;
+  }
+
 
 #ifdef CONFIG_DOS
   if(!mem_init(&_vm.ram, 32LL * 1024 * 1024, _opts.swapFile)) {
@@ -296,11 +311,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, ACLINT_BASE, aclint_device(&_vm.aclint))) {
-    _vmDestroy();
-    return 1;
-  }
-
   if(!plic_init(&_vm.plic, harts) || !bus_register(&_vm.bus, PLIC_BASE, plic_device(&_vm.plic))) {
     _vmDestroy();
     return 1;
@@ -311,18 +321,15 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  const cpu_addr_t dtbAddress = _buildDeviceTree();
+  if(!dtbAddress) {
+    _vmDestroy();
+    return 1;
+  }
+
   cpu_addr_t entryPoint = 0;
   if(_opts.kernelFile) {
-    const cpu_addr_t dtbAddress = _buildDeviceTree();
-    if(!dtbAddress) {
-      _vmDestroy();
-      return 1;
-    }
-
     entryPoint = _loadLinuxImage(_opts.kernelFile, &_vm.ram, RAM_BASE);
-
-    rv_pokeRx(&_vm.cpu, CPU_REG_A0, 0);  // hart id
-    rv_pokeRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
   } else {
     entryPoint = _loadBin(_opts.binFile, &_vm.ram, RAM_BASE);
   }
@@ -331,8 +338,14 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  INFO("Resetting the CPU...");
-  rv_reset(&_vm.cpu, entryPoint);
+  if(_opts.noSBI) {
+    INFO("Resetting the CPU...");
+    rv_reset(&_vm.cpu, RV_PRIV_MODE_MACHINE, entryPoint);
+    rv_pokeRx(&_vm.cpu, CPU_REG_A0, rv_getHartID(&_vm.cpu));
+    rv_pokeRx(&_vm.cpu, CPU_REG_A1, dtbAddress);
+  } else {
+    sbi_startHart(&_vm.cpu, entryPoint, dtbAddress);
+  }
 
   uint64_t runtime_ms = 0;
   clock_t ts = clock();
@@ -347,7 +360,7 @@ int main(int argc, char* argv[]) {
 
   for(long int cyclesAcc = 0;;) {
 #ifdef MAX_CYCLES
-    if(aclint_mtime(&_vm.aclint) >= MAX_CYCLES)
+    if(aclint_getMtime(&_vm.aclint) >= MAX_CYCLES)
       break;
 #endif
 
@@ -395,7 +408,7 @@ int main(int argc, char* argv[]) {
   const unsigned long duration_ms = dur / (CLOCKS_PER_SEC / 1000);
 
   putc('\n', stderr);
-  DEBUG("CPU executed %" PRIu64 " cycles in %lu.%03lu sec PC: %" PRI_CPU_PTR, aclint_mtime(&_vm.aclint), duration_ms / 1000UL, duration_ms % 1000UL, rv_peekPC(&_vm.cpu));
+  DEBUG("CPU executed %" PRIu64 " cycles in %lu.%03lu sec PC: %" PRI_CPU_PTR, aclint_getMtime(&_vm.aclint), duration_ms / 1000UL, duration_ms % 1000UL, rv_peekPC(&_vm.cpu));
 #endif
 
   _vmDestroy();

@@ -7,11 +7,7 @@
 
 #include "rv.h"
 
-#include "../log.h"
-
 #include "rv_internal.h"
-
-#include <assert.h>
 
 static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
   // Reading CSRs can have side effects
@@ -20,11 +16,41 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
 
   const RV_PrivMode csrPrivMode = (RV_PrivMode)((unsigned int)(csr >> 8) & 3);
   if(self->mode < csrPrivMode) {
-    _trap(self, MCAUSE_INST_ILL, false);
+    _trap(self, TRAP_INST_ILL);
     return 0;
   }
 
   switch(csr) {
+    // SSTATUS
+    case 0x100: return self->csr.mstatus & ~SSTATUS_WPRI_MASK;
+
+    // SIE
+    case 0x104: return self->csr.sie;
+
+    // STVEC
+    case 0x105: return self->csr.stvec;
+
+    // SCOUNTEREN
+    case 0x106: return self->csr.scounteren;
+
+    // SENVCFG
+    case 0x10A: return self->csr.senvcfg;
+
+    // MSCRATCH
+    case 0x140: return self->csr.sscratch;
+
+    // SEPC
+    case 0x141: return self->csr.sepc;
+
+    // SCAUSE
+    case 0x142: return self->csr.scause;
+
+    // STVAL
+    case 0x143: return self->csr.stval;
+
+    // SIP
+    case 0x144: return self->csr.sip;
+
     // MSTATUS
     case 0x300: return self->csr.mstatus;
 
@@ -40,6 +66,7 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
         | MISA_EXT_BIT('c')
         | MISA_EXT_BIT('i')
         | MISA_EXT_BIT('m')
+        | MISA_EXT_BIT('s')
         | MISA_EXT_BIT('u');
     }
 
@@ -72,22 +99,41 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     // MIP
     case 0x344: return self->csr.mip;
 
-    // MVENDORID
-    case 0xF11:
-    // MARCHID
-    case 0xF12:
-    // MAIMPID
-    case 0xF13:
-    // MHARTID
-    case 0xF14:
-      return 0;
+    // TIME
+    case 0xC01: {
+      if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.scounteren & SCOUNTEREN_TM_MASK))
+        break;
 
-    default: {
-      _trap(self, MCAUSE_INST_ILL, false);
-      break;
+      return aclint_getMtime(self->aclint);
     }
+
+#ifndef CONFIG_RV64s
+    // TIMEH
+    case 0xC81: {
+      if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.scounteren & SCOUNTEREN_TM_MASK))
+        break;
+
+      return aclint_getMtime(self->aclint) >> 32;
+    }
+#endif
+
+    // MVENDORID
+    case 0xF11: return RV_MVENDORID;
+
+    // MARCHID
+    case 0xF12: return RV_MARCHID;
+
+    // MIMPID
+    case 0xF13: return RV_MIMPID;
+
+    // MHARTID
+    case 0xF14: return self->csr.mhartid;
+
+    default:
+      break;
   }
 
+  _trap(self, TRAP_INST_ILL);
   return 0;
 }
 
@@ -97,21 +143,76 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
   const RV_PrivMode csrPrivMode = (RV_PrivMode)((unsigned int)(csr >> 8) & 3);
   if(self->mode < csrPrivMode) {
-    _trap(self, MCAUSE_INST_ILL, false);
+    _trap(self, TRAP_INST_ILL);
     return;
   }
 
   switch(csr) {
-    case 0x300: {
-      // MSTATUS
-      if((self->csr.mstatus & MSTATUS_MIE_MASK) != (val & MSTATUS_MIE_MASK))
+    case 0x100: {
+      // SSTATUS
+      _writeMstatus(self, (val & ~SSTATUS_WPRI_MASK) | (self->csr.mstatus & SSTATUS_WPRI_MASK));
+      break;
+    }
+
+    case 0x104: {
+      // SIE
+      const cpu_word_t newSie = (self->csr.sie & ~SIE_RW_MASK) | (val & SIE_RW_MASK);
+      if(self->csr.sie != newSie)
         _pendingIRQ(self);
 
-      RV_PrivMode mpp = MSTATUS_GET_MPP(val);
-      if(mpp != RV_PRIV_MODE_USER)
-        mpp = RV_PRIV_MODE_MACHINE;
+      self->csr.sie = newSie;
+      break;
+    }
 
-      self->csr.mstatus = (MSTATUS_WR_VAL(val) & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(mpp);
+    case 0x105: {
+      // STVEC
+      self->csr.stvec = val;
+      break;
+    }
+
+    case 0x106: {
+      // SCOUNTEREN
+      self->csr.scounteren = val & SCOUNTEREN_WR_MASK;
+      break;
+    }
+
+    case 0x10A: {
+      // SENVCFG
+      self->csr.senvcfg = val;
+      break;
+    }
+
+    case 0x140: {
+      // SSCRATCH
+      self->csr.sscratch = val;
+      break;
+    }
+
+    case 0x141: {
+      // SEPC
+      self->csr.sepc = val & ~(cpu_word_t)1;
+      break;
+    }
+
+    case 0x143: {
+      // STVAL
+      self->csr.stval = val;
+      break;
+    }
+
+    case 0x144: {
+      // SIP
+      const cpu_word_t newSip = (self->csr.mip & ~SIP_RW_MASK) | (val & SIP_RW_MASK);
+      if(self->csr.sip != newSip)
+        _pendingIRQ(self);
+
+      self->csr.sip = newSip;
+      break;
+    }
+
+    case 0x300: {
+      // MSTATUS
+      _writeMstatus(self, val);
       break;
     }
 
@@ -178,7 +279,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     }
 
     default: {
-      _trap(self, MCAUSE_INST_ILL, false);
+      _trap(self, TRAP_INST_ILL);
       break;
     }
   }

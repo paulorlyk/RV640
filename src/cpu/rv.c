@@ -10,48 +10,77 @@
 #include "rv_instr.h"
 #include "rv_cext.h"
 
-#include <string.h>
-#include <assert.h>
+#include "../sbi.h"
 
-static inline void _processPendingInterrupts(RV_Cpu *self) {
+#include <string.h>
+
+static inline void _processPendingMInterrupts(RV_Cpu *self) {
   static const unsigned int vectors[] = {
-    MCAUSE_MACHINE_EXT_INT,
-    MCAUSE_MACHINE_SW_INT,
-    MCAUSE_MACHINE_TMR_INT,
-    // MCAUSE_SUPERVISOR_EXT_INT,
-    // MCAUSE_SUPERVISOR_SW_INT,
-    // MCAUSE_SUPERVISOR_TMR_INT,
-    // MCAUSE_CTR_OVF_INT,
+    IRQ_MACHINE_EXT_INT,
+    IRQ_MACHINE_SW_INT,
+    IRQ_MACHINE_TMR_INT,
   };
   static const cpu_word_t masks[] = {
-    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_EXT_INT,
-    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_SW_INT,
-    (cpu_word_t)1 << (unsigned int)MCAUSE_MACHINE_TMR_INT,
-    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT,
-    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_SW_INT,
-    // (cpu_word_t)1 << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT,
-    // (cpu_word_t)1 << (unsigned int)MCAUSE_CTR_OVF_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_MACHINE_EXT_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_MACHINE_SW_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_MACHINE_TMR_INT,
   };
-
-  if(self->mode == RV_PRIV_MODE_MACHINE && (self->csr.mstatus & MSTATUS_MIE_MASK) == 0)
-    return;
 
   const cpu_word_t interrupts = self->csr.mip & self->csr.mie;
   if(interrupts) {
     for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
       if(interrupts & masks[i]) {
-        _trap(self, vectors[i], true);
+        _interrupt(self, vectors[i], false);
         break;
       }
     }
   }
 }
 
+static inline void _processPendingSInterrupts(RV_Cpu *self) {
+  static const unsigned int vectors[] = {
+    IRQ_SUPERVISOR_EXT_INT,
+    IRQ_SUPERVISOR_SW_INT,
+    IRQ_SUPERVISOR_TMR_INT,
+    IRQ_CTR_OVF_INT,
+  };
+  static const cpu_word_t masks[] = {
+    (cpu_word_t)1 << (unsigned int)IRQ_SUPERVISOR_EXT_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_SUPERVISOR_SW_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_SUPERVISOR_TMR_INT,
+    (cpu_word_t)1 << (unsigned int)IRQ_CTR_OVF_INT,
+  };
+
+  const cpu_word_t mInterrupts = self->csr.mip & self->csr.mie;
+  const cpu_word_t sInterrupts = self->csr.sip & self->csr.sie;
+  if(mInterrupts || sInterrupts) {
+    const bool ie = self->csr.mstatus & MSTATUS_SIE_MASK;
+    for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
+      const bool delegate = self->csr.mideleg & self->csr.sie & masks[i];
+      if(masks[i] & ((ie && delegate) ? sInterrupts : mInterrupts)) {
+        _interrupt(self, vectors[i], delegate);
+        break;
+      }
+    }
+  }
+}
+
+static inline void _processPendingInterrupts(RV_Cpu *self) {
+  if(self->mode == RV_PRIV_MODE_MACHINE && (self->csr.mstatus & MSTATUS_MIE_MASK) == 0)
+    return;
+
+  if(!self->trap)
+    _processPendingMInterrupts(self);
+
+  if(!self->trap)
+    _processPendingSInterrupts(self);
+}
+
 static inline uint32_t _fetch(RV_Cpu *self) {
   const cpu_addr_t pc = _readPC(self);
 
   if(pc & 1) {
-    _trap(self, MCAUSE_INST_ALLIGN, false);
+    _trap(self, TRAP_INST_ALLIGN);
     return 0;
   }
 
@@ -67,7 +96,7 @@ static inline uint32_t _fetch(RV_Cpu *self) {
       // Very end of the memory, less than a cache line size
       if(!bus_read(self->bus, pc, &res, sizeof(res))) {
         // Out of a valid address space
-        _trap(self, MCAUSE_INST_AF, false);
+        _trap(self, TRAP_INST_AF);
         return 0;
       }
 
@@ -91,33 +120,71 @@ static inline void _doTrap(RV_Cpu* self) {
   self->trap = false;
   self->wfi = false;
 
-  cpu_word_t vec = self->csr.mtvec & ~(cpu_word_t)3;
-  if(self->csr.mcause & CPU_SIGN_BIT) {
-    // Interrupt
-    const cpu_word_t mode = self->csr.mtvec & 3;
-    if(mode == 1)
-      vec += 4 * (self->csr.mcause & ~CPU_SIGN_BIT);
+  const bool irq = self->trapCause & CPU_SIGN_BIT;
+  const cpu_word_t cause = (self->trapCause & ~CPU_SIGN_BIT);
+
+  cpu_word_t xtvec;
+  if(!self->trapDelegate) {
+    xtvec = self->csr.mtvec;
+
+    self->csr.mcause = self->trapCause;
+
+    // Copy MIE -> MPIE and clear MIE
+    self->csr.mstatus = (self->csr.mstatus & ~(MSTATUS_MPIE_MASK | MSTATUS_MIE_MASK)) | ((self->csr.mstatus & MSTATUS_MIE_MASK) ? MSTATUS_MPIE_MASK : 0);
+
+    // Save privilege mode
+    self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(self->mode);
+
+    self->mode = RV_PRIV_MODE_MACHINE;
+
+    self->csr.mtval = 0;
+    self->csr.mepc = _readPC(self);
   } else {
-    // DEBUG("RV: Executing trap @%" PRI_CPU_PTR " -> %" PRI_CPU_PTR " cause: %" PRI_CPU_XWORD, _readPC(self), vec, self->mcause);
+    xtvec = self->csr.stvec;
+
+    self->csr.scause = self->trapCause;
+
+    // Copy SIE -> SPIE and clear SIE
+    self->csr.mstatus = (self->csr.mstatus & ~(MSTATUS_SPIE_MASK | MSTATUS_SIE_MASK)) | ((self->csr.mstatus & MSTATUS_SIE_MASK) ? MSTATUS_SPIE_MASK : 0);
+
+    // Save privilege mode
+    self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_SPP_MASK) | MSTATUS_SPP(self->mode);
+
+    self->mode = RV_PRIV_MODE_SUPERVISOR;
+
+    self->csr.stval = 0;
+    self->csr.sepc = _readPC(self);
   }
 
-  // Copy MIE -> MPIE and clear MIE
-  self->csr.mstatus = (self->csr.mstatus & ~(MSTATUS_MPIE_MASK | MSTATUS_MIE_MASK)) | ((self->csr.mstatus & MSTATUS_MIE_MASK) ? MSTATUS_MPIE_MASK : 0);
+  cpu_word_t vec = xtvec & ~(cpu_word_t)3;
+  if(irq && (xtvec & 3) == 1)
+    vec += 4 * cause;
 
-  // Save privilege mode
-  self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(self->mode);
-
-  self->mode = RV_PRIV_MODE_MACHINE;
-
-  self->csr.mepc = self->PC;
-
-  _writePC(self, vec);
+  if(self->mode == RV_PRIV_MODE_MACHINE && self->virtualSBI) {
+    if(cause == TRAP_CALL_S) {
+      sbi_handleEcall(self);
+      _xret(self, RV_PRIV_MODE_MACHINE, -4);
+    } else if(irq) {
+      sbi_handleInterrupt(self);
+      _xret(self, RV_PRIV_MODE_MACHINE, 0);
+    } else {
+      sbi_handleException(self);
+      _xret(self, RV_PRIV_MODE_MACHINE, 0);
+    }
+  } else {
+    _writePC(self, vec);
+  }
 }
 
-bool rv_init(RV_Cpu* self, Bus *bus) {
+bool rv_init(RV_Cpu* self, Bus *bus, Aclint *aclint, int hartId, bool virtualSBI) {
   memset(self, 0, sizeof(*self));
 
   self->bus = bus;
+  self->aclint = aclint;
+
+  self->virtualSBI = virtualSBI;
+
+  self->csr.mhartid = hartId;
 
   return true;
 }
@@ -131,7 +198,7 @@ void rv_destroy(RV_Cpu *self) {
 #endif
 }
 
-void rv_reset(RV_Cpu *self, cpu_addr_t start) {
+void rv_reset(RV_Cpu *self, RV_PrivMode mode, cpu_addr_t start) {
   _flushIcache(self);
 
   bus_reservationCheckInvalidate(self->bus, 0, 0);
@@ -144,12 +211,13 @@ void rv_reset(RV_Cpu *self, cpu_addr_t start) {
 #endif
 
   self->csr.menvcfg = MENVCFG_CBZE_MASK;
+  self->csr.senvcfg = SENVCFG_CBZE_MASK;
 
   self->irq = false;
 
   self->trap = false;
 
-  self->mode = RV_PRIV_MODE_MACHINE;
+  self->mode = mode;
 
   _writePC(self, start);
 }
@@ -176,14 +244,18 @@ void rv_run(RV_Cpu *self) {
   _writePC(self, _readPC(self) + instrSize);
 }
 
-void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n) {
+void rv_setInterrupt(RV_Cpu *self, RV_IrqCause n) {
   const cpu_word_t mask = (cpu_word_t)1 << n;
 
   self->csr.mip |= mask;
+  self->csr.sip |= mask & SIP_RW_MASK;
 
   _pendingIRQ(self);
 }
 
-void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n) {
-  self->csr.mip &= ~((cpu_word_t)1 << n);
+void rv_clearInterrupt(RV_Cpu *self, RV_IrqCause n) {
+  const cpu_word_t mask = (cpu_word_t)1 << n;
+
+  self->csr.mip &= ~mask;
+  self->csr.sip &= ~(mask & SIP_RW_MASK);
 }

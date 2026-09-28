@@ -4,6 +4,8 @@
 
 #include "aclint.h"
 
+#include "../cpu/rv.h"
+
 #include <string.h>
 
 static void _updateMtimer(Aclint *self) {
@@ -11,12 +13,12 @@ static void _updateMtimer(Aclint *self) {
     if(self->mtimer.mtime >= self->mtimer.mtimecmp[i]) {
       if(!self->mtimer.pindingIrq[i]) {
         self->mtimer.pindingIrq[i] = true;
-        rv_setInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
+        rv_setInterrupt(self->harts[i], IRQ_MACHINE_TMR_INT);
       }
     } else {
       if(self->mtimer.pindingIrq[i]) {
         self->mtimer.pindingIrq[i] = false;
-        rv_clearInterrupt(self->harts[i], MCAUSE_MACHINE_TMR_INT);
+        rv_clearInterrupt(self->harts[i], IRQ_MACHINE_TMR_INT);
       }
     }
   }
@@ -25,9 +27,9 @@ static void _updateMtimer(Aclint *self) {
 static void _updateMswi(const Aclint *self) {
   for(int i = 0; i < ACLINT_HARTS; ++i) {
     if(self->mswi.msip[i])
-      rv_setInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
+      rv_setInterrupt(self->harts[i], IRQ_MACHINE_SW_INT);
     else
-      rv_clearInterrupt(self->harts[i], MCAUSE_MACHINE_SW_INT);
+      rv_clearInterrupt(self->harts[i], IRQ_MACHINE_SW_INT);
   }
 }
 
@@ -94,4 +96,10 @@ void aclint_tick(Aclint *self, unsigned int cycles) {
 
 uint64_t aclint_mtimeRemains(Aclint *self, int hart) {
   return self->mtimer.mtimecmp[hart] - self->mtimer.mtime;
+}
+
+void aclint_setMtimecmp(Aclint *self, int hart, uint64_t val) {
+  self->mtimer.mtimecmp[hart] = val;
+
+  _updateMtimer(self);
 }

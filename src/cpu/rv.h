@@ -7,6 +7,7 @@
 
 #include "rv_types.h"
 #include "../bus.h"
+#include "../dev/aclint.h"
 
 #ifndef CONFIG_DOS
 #include <endian.h>
@@ -17,11 +18,15 @@
 
 // #define CPU_STATS
 
+#define RV_MVENDORID  0
+#define RV_MARCHID    0x1442
+#define RV_MIMPID     0x640
+
 #define ICACHE_LINE_SIZE 128
 
 #define DCACHE_LINE_SIZE 64
 
-typedef struct {
+typedef struct RV_Cpu_struct {
   union {
     struct {
       cpu_word_t zero;
@@ -62,6 +67,7 @@ typedef struct {
   cpu_addr_t PC;
 
   struct {
+    cpu_word_t mhartid;   // Hart ID Register
     cpu_word_t mip;       // Machine Interrupt-Pending
     cpu_word_t mie;       // Machine Interrupt-Enable
     cpu_word_t mscratch;  // Machine Scratch Register
@@ -74,14 +80,29 @@ typedef struct {
     cpu_word_t mepc;      // Machine Exception Program Counter Register
     cpu_word_t mtval;     // Machine Trap Value Register
     cpu_word_t menvcfg;   // Machine Environment Configuration Register
+    cpu_word_t medeleg;   // Machine Trap Delegation Register
+    cpu_word_t mideleg;   // Machine Interrupt Delegation Register
+
+    cpu_word_t sip;         // Supervisor Interrupt-Pending
+    cpu_word_t sie;         // Supervisor Interrupt-Enable
+    cpu_word_t sscratch;    // Supervisor Scratch Register
+    cpu_word_t stvec;       // Supervisor Trap-Vector Base-Address
+    cpu_word_t scause;      // Supervisor Cause
+    cpu_word_t sepc;        // Supervisor Exception Program Counter Register
+    cpu_word_t stval;       // Supervisor Trap Value Register
+    cpu_word_t senvcfg;     // Supervisor Environment Configuration Register
+    cpu_word_t scounteren;  // Supervisor Counter-Enable Register
   } csr;
 
   bool trap;
+  cpu_word_t trapCause;
+  bool trapDelegate;
+
   bool irq;
+  bool wfi;
 
   Bus *bus;
-
-  bool wfi;
+  Aclint *aclint;
 
   struct {
     cpu_addr_t base;
@@ -90,13 +111,15 @@ typedef struct {
 
   RV_PrivMode mode;
 
+  bool virtualSBI;
+
 #ifdef CPU_STATS
   uint32_t icacheHits;
   uint32_t icacheMisses;
 #endif
 } RV_Cpu;
 
-bool rv_init(RV_Cpu* self, Bus *bus);
+bool rv_init(RV_Cpu* self, Bus *bus, Aclint *aclint, int hartId, bool virtualSBI);
 void rv_destroy(RV_Cpu *self);
 
 #define rv_peekPC(self) (*(const cpu_addr_t *)&(self)->PC)
@@ -106,11 +129,13 @@ void rv_destroy(RV_Cpu *self);
 
 #define rv_isWFI(self) (!!((self)->wfi))
 
-void rv_reset(RV_Cpu *self, cpu_addr_t start);
+#define rv_getHartID(self) (*(const cpu_word_t *)&(self)->csr.mhartid)
+
+void rv_reset(RV_Cpu *self, RV_PrivMode mode, cpu_addr_t start);
 
 void rv_run(RV_Cpu *self);
 
-void rv_setInterrupt(RV_Cpu *self, RV_MCAUSE n);
-void rv_clearInterrupt(RV_Cpu *self, RV_MCAUSE n);
+void rv_setInterrupt(RV_Cpu *self, RV_IrqCause n);
+void rv_clearInterrupt(RV_Cpu *self, RV_IrqCause n);
 
 #endif //RV_H_2EAB5CD7ECCA42E6BF26D6DE898C51FA

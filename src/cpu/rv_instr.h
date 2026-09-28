@@ -34,7 +34,7 @@ struct _instr {
 static inline void _doILL(RV_Cpu* self, const struct _instr *di) {
   (void)di;
 
-  _trap(self, MCAUSE_INST_ILL, false);
+  _trap(self, TRAP_INST_ILL);
 
   DEBUG("RV: ILL PC: %" PRI_CPU_PTR, _readPC(self));
   assert(false);
@@ -55,30 +55,34 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
       switch(di->iimm) {
         case 0: {
           // ECALL
-          RV_MCAUSE cause;
+          RV_TrapCause cause;
           switch(self->mode) {
             default:
-            case RV_PRIV_MODE_USER: cause = MCAUSE_CALL_U; break;
-            case RV_PRIV_MODE_SUPERVISOR: cause = MCAUSE_CALL_S; break;
-            case RV_PRIV_MODE_MACHINE: cause = MCAUSE_CALL_M; break;
+            case RV_PRIV_MODE_USER: cause = TRAP_CALL_U; break;
+            case RV_PRIV_MODE_SUPERVISOR: cause = TRAP_CALL_S; break;
+            case RV_PRIV_MODE_MACHINE: cause = TRAP_CALL_M; break;
           }
 
-          self->csr.mtval = 0;
-          _trap(self, cause, false);
+          _trap(self, cause);
           break;
         }
 
         case 1: {
           // EBREAK
-          self->csr.mtval = 0;
-          _trap(self, MCAUSE_BREAKPOINT, false);
+          _trap(self, TRAP_BREAKPOINT);
+          break;
+        }
+
+        case 0x102: {
+          // SRET
+          _xret(self, RV_PRIV_MODE_SUPERVISOR, (int)di->size);
           break;
         }
 
         case 0x105: {
           // WFI
           if(self->mode != RV_PRIV_MODE_MACHINE && self->csr.mstatus & MSTATUS_TW_MASK) {
-            _trap(self, MCAUSE_INST_ILL, false);
+            _trap(self, TRAP_INST_ILL);
             break;
           }
 
@@ -88,21 +92,7 @@ static inline void _doSYSTEM(RV_Cpu* self, const struct _instr *di) {
 
         case 0x302: {
           // MRET
-          if(self->mode == RV_PRIV_MODE_USER) {
-            _trap(self, MCAUSE_INST_ILL, false);
-            break;
-          }
-
-          // Restore MIE
-          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MIE_MASK) | ((self->csr.mstatus & MSTATUS_MPIE_MASK) ? MSTATUS_MIE_MASK : 0) | MSTATUS_MPIE_MASK;
-
-          // Restore privilege mode
-          self->mode = MSTATUS_GET_MPP(self->csr.mstatus);
-          self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(RV_PRIV_MODE_USER);
-          if(self->mode == RV_PRIV_MODE_USER)
-            self->csr.mstatus &= ~MSTATUS_MPRV_MASK;
-
-          _writePC(self, self->csr.mepc - di->size);
+          _xret(self, RV_PRIV_MODE_MACHINE, (int)di->size);
           break;
         }
 
@@ -202,7 +192,11 @@ static inline void _doMISCMEM(RV_Cpu* self, const struct _instr *di) {
           // CBO.ZERO
           if(!di->rd) {
             if(self->mode < RV_PRIV_MODE_MACHINE && (self->csr.menvcfg & MENVCFG_CBZE_MASK) == 0) {
-              _trap(self, MCAUSE_INST_ILL, false);
+              _trap(self, TRAP_INST_ILL);
+              break;
+            }
+            if(self->mode < RV_PRIV_MODE_SUPERVISOR && (self->csr.senvcfg & SENVCFG_CBZE_MASK) == 0) {
+              _trap(self, TRAP_INST_ILL);
               break;
             }
 
@@ -649,7 +643,7 @@ static inline void _doAMO(RV_Cpu* self, const struct _instr *di) {
 
   const cpu_addr_t rs1 = _readReg(self, di->rs1);
   if((rs1 & (size - 1))) {
-    _trap(self, MCAUSE_ST_ALLIGN, false);
+    _trap(self, TRAP_ST_ALLIGN);
     return;
   }
 

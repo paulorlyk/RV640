@@ -10,6 +10,8 @@
 
 #include "../utils.h"
 
+typedef struct RV_Cpu_struct RV_Cpu;
+
 #ifdef CONFIG_RV64
 
 typedef uint64_t cpu_word_t;
@@ -126,32 +128,34 @@ typedef enum {
 } RV_REG;
 
 typedef enum {
-  MCAUSE_SUPERVISOR_SW_INT = 1,   // Supervisor software interrupt
-  MCAUSE_MACHINE_SW_INT = 3,      // Machine software interrupt
-  MCAUSE_SUPERVISOR_TMR_INT = 5,  // Supervisor timer interrupt
-  MCAUSE_MACHINE_TMR_INT = 7,     // Machine timer interrupt
-  MCAUSE_SUPERVISOR_EXT_INT = 9,  // Supervisor external interrupt
-  MCAUSE_MACHINE_EXT_INT = 11,    // Machine external interrupt
-  MCAUSE_CTR_OVF_INT = 13,        // Counter-overflow interrupt
+  TRAP_INST_ALLIGN = 0,           // Instruction address misaligned
+  TRAP_INST_AF = 1,               // Instruction access fault
+  TRAP_INST_ILL = 2,              // Illegal instruction
+  TRAP_BREAKPOINT = 3,            // Breakpoint
+  TRAP_LD_ALLIGN = 4,             // Load address misaligned
+  TRAP_LD_AF = 5,                 // Load access fault
+  TRAP_ST_ALLIGN = 6,             // Store/AMO address misaligned
+  TRAP_ST_AF = 7,                 // Store/AMO access fault
+  TRAP_CALL_U = 8,                // Environment call from U-mode
+  TRAP_CALL_S = 9,                // Environment call from S-mode
+  TRAP_CALL_M = 11,               // Environment call from M-mode
+  TRAP_INST_PF = 12,              // Instruction page fault
+  TRAP_LD_PF = 13,                // Load page fault
+  TRAP_ST_PF = 15,                // Store/AMO page fault
+  TRAP_DOUBLE_TRAP = 16,          // Double trap
+  TRAP_SW_CHECK = 18,             // Software check
+  TRAP_HW_ERR = 19,               // Hardware error
+} RV_TrapCause;
 
-  MCAUSE_INST_ALLIGN = 0,         // Instruction address misaligned
-  MCAUSE_INST_AF = 1,             // Instruction access fault
-  MCAUSE_INST_ILL = 2,            // Illegal instruction
-  MCAUSE_BREAKPOINT = 3,          // Breakpoint
-  MCAUSE_LD_ALLIGN = 4,           // Load address misaligned
-  MCAUSE_LD_AF = 5,               // Load access fault
-  MCAUSE_ST_ALLIGN = 6,           // Store/AMO address misaligned
-  MCAUSE_ST_AF = 7,               // Store/AMO access fault
-  MCAUSE_CALL_U = 8,              // Environment call from U-mode
-  MCAUSE_CALL_S = 9,              // Environment call from S-mode
-  MCAUSE_CALL_M = 11,             // Environment call from M-mode
-  MCAUSE_INST_PF = 12,            // Instruction page fault
-  MCAUSE_LD_PF = 13,              // Load page fault
-  MCAUSE_ST_PF = 15,              // Store/AMO page fault
-  MCAUSE_DOUBLE_TRAP = 16,        // Double trap
-  MCAUSE_SW_CHECK = 18,           // Software check
-  MCAUSE_HW_ERR = 19,             // Hardware error
-} RV_MCAUSE;
+typedef enum {
+  IRQ_SUPERVISOR_SW_INT = 1,      // Supervisor software interrupt
+  IRQ_MACHINE_SW_INT = 3,         // Machine software interrupt
+  IRQ_SUPERVISOR_TMR_INT = 5,     // Supervisor timer interrupt
+  IRQ_MACHINE_TMR_INT = 7,        // Machine timer interrupt
+  IRQ_SUPERVISOR_EXT_INT = 9,     // Supervisor external interrupt
+  IRQ_MACHINE_EXT_INT = 11,       // Machine external interrupt
+  IRQ_CTR_OVF_INT = 13,           // Counter-overflow interrupt
+} RV_IrqCause;
 
 typedef enum {
   RV_PRIV_MODE_USER = 0,
@@ -163,77 +167,77 @@ typedef enum {
 #define MISA_EXT_BIT(letter) ((cpu_word_t)1 << ((unsigned int)(letter) - (unsigned int)'a'))
 
 #define MIE_RW_MASK  ( \
-    (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_SW_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_MACHINE_SW_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_MACHINE_TMR_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_MACHINE_EXT_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_CTR_OVF_INT) \
+    (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
   | (~(cpu_word_t)0xFFFF) \
   )
 
 #define MIP_RW_MASK  ( \
-    (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_SW_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_TMR_INT) \
-  | (((cpu_word_t)1) << (unsigned int)MCAUSE_SUPERVISOR_EXT_INT) \
+    (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_MACHINE_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
   )
+
+#define SIE_RW_MASK  ( \
+    (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
+  | (~(cpu_word_t)0xFFFF) \
+  )
+
+#define SIP_RW_MASK  ( \
+    (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
+  )
+
+#define MSTATUS_UBE_MASK  (((cpu_word_t)1) << 6)                              // User-mode endianness
+#define MSTATUS_VS_MASK   ((((cpu_word_t)1) << 9) | (((cpu_word_t)1) << 10))  // Vector extension state
+#define MSTATUS_FS_MASK   ((((cpu_word_t)1) << 13) | (((cpu_word_t)1) << 14)) // Floating-point state
+#define MSTATUS_XS_MASK   ((((cpu_word_t)1) << 15) | (((cpu_word_t)1) << 16)) // Additional extension state
+#define MSTATUS_SIE_MASK  (((cpu_word_t)1) << 1)                              // Supervisor Interrupt Enable
+#define MSTATUS_MIE_MASK  (((cpu_word_t)1) << 3)                              // Machine Interrupt Enable
+#define MSTATUS_SPIE_MASK (((cpu_word_t)1) << 5)                              // Supervisor Previous Interrupt Enable
+#define MSTATUS_MPIE_MASK (((cpu_word_t)1) << 7)                              // Machine Previous Interrupt Enable
+#define MSTATUS_SPP_MASK  (((cpu_word_t)1) << 8)                              // Previous supervisor privilege
+#define MSTATUS_MPP_MASK  ((((cpu_word_t)1) << 11) | (((cpu_word_t)1) << 12)) // Previous machine privilege
+#define MSTATUS_MPRV_MASK (((cpu_word_t)1) << 17)                             // Modify PRiVilege
+#define MSTATUS_SUM_MASK  (((cpu_word_t)1) << 18)                             // Supervisor User Memory access
+#define MSTATUS_MXR_MASK  (((cpu_word_t)1) << 19)                             // Make eXecutable Readable
+#define MSTATUS_TVM_MASK  (((cpu_word_t)1) << 20)                             // Trap Virtual Memory
+#define MSTATUS_TW_MASK   (((cpu_word_t)1) << 21)                             // Timeout Wait
+#define MSTATUS_TSR_MASK  (((cpu_word_t)1) << 22)                             // Trap SRET
 
 #ifdef CONFIG_RV64
 
 #define MSTATUS_WPRI_MASK ((((cpu_word_t)1) << 0) | (((cpu_word_t)1) << 2) | (((cpu_word_t)1) << 4) | (((cpu_word_t)0x7F) << 25) | (((cpu_word_t)1) << 40) | (((cpu_word_t)0x1F) << 43) | (((cpu_word_t)0x7FFF) << 48))
-#define MSTATUS_UBE_MASK  (((cpu_word_t)1) << 6)                              // User-mode endianness
 #define MSTATUS_SBE_MASK  (((cpu_word_t)1) << 36)                             // Supervisor-mode endianness
 #define MSTATUS_MBE_MASK  (((cpu_word_t)1) << 37)                             // Machine-mode endianness
-
 #define MSTATUS_UXL_MASK  ((((cpu_word_t)1) << 32) | (((cpu_word_t)1) << 33)) // XLEN for U-mode
 #define MSTATUS_UXL_32    (((cpu_word_t)1) << 32)
 #define MSTATUS_UXL_64    (((cpu_word_t)1) << 33)
 #define MSTATUS_SXL_MASK  ((((cpu_word_t)1) << 34) | (((cpu_word_t)1) << 35)) // XLEN for S-mode
 #define MSTATUS_SXL_32    (((cpu_word_t)1) << 34)
 #define MSTATUS_SXL_64    (((cpu_word_t)1) << 35)
-
-#define MSTATUS_VS_MASK   ((((cpu_word_t)1) << 9) | (((cpu_word_t)1) << 10))  // Vector extension state
-#define MSTATUS_FS_MASK   ((((cpu_word_t)1) << 13) | (((cpu_word_t)1) << 14)) // Floating-point state
-#define MSTATUS_XS_MASK   ((((cpu_word_t)1) << 15) | (((cpu_word_t)1) << 16)) // Additional extension state
 #define MSTATUS_SD_MASK   (((cpu_word_t)1) << 63)                             // State Dirty summary bit
-
-#define MSTATUS_SIE_MASK  (((cpu_word_t)1) << 1)                              // Supervisor Interrupt Enable
-#define MSTATUS_MIE_MASK  (((cpu_word_t)1) << 3)                              // Machine Interrupt Enable
-#define MSTATUS_SPIE_MASK (((cpu_word_t)1) << 5)                              // Supervisor Previous Interrupt Enable
-#define MSTATUS_MPIE_MASK (((cpu_word_t)1) << 7)                              // Machine Previous Interrupt Enable
-#define MSTATUS_SPP_MASK  (((cpu_word_t)1) << 8)                              // Previous supervisor privilege
-#define MSTATUS_MPP_MASK  ((((cpu_word_t)1) << 11) | (((cpu_word_t)1) << 12)) // Previous machine privilege
-#define MSTATUS_MPRV_MASK (((cpu_word_t)1) << 17)                             // Modify PRiVilege
-#define MSTATUS_SUM_MASK  (((cpu_word_t)1) << 18)                             // Supervisor User Memory access
-#define MSTATUS_MXR_MASK  (((cpu_word_t)1) << 19)                             // Make eXecutable Readable
-#define MSTATUS_TVM_MASK  (((cpu_word_t)1) << 20)                             // Trap Virtual Memory
-#define MSTATUS_TW_MASK   (((cpu_word_t)1) << 21)                             // Timeout Wait
-#define MSTATUS_TSR_MASK  (((cpu_word_t)1) << 22)                             // Trap SRET
 
 #define MSTATUS_WR_VAL(val) (((val) & ~(MSTATUS_WPRI_MASK | MSTATUS_UBE_MASK | MSTATUS_SBE_MASK | MSTATUS_MBE_MASK | MSTATUS_VS_MASK | MSTATUS_FS_MASK | MSTATUS_XS_MASK | MSTATUS_SD_MASK | MSTATUS_UXL_MASK | MSTATUS_SXL_MASK)) | MSTATUS_UXL_64 | MSTATUS_SXL_64)
 
 #else
+
 #define MSTATUS_WPRI_MASK ((((cpu_word_t)1) << 0) | (((cpu_word_t)1) << 2) | (((cpu_word_t)1) << 4) | (((cpu_word_t)0x3F) << 25))
-#define MSTATUS_UBE_MASK  (((cpu_word_t)1) << 6)                              // User-mode endianness
-
-#define MSTATUS_VS_MASK   ((((cpu_word_t)1) << 9) | (((cpu_word_t)1) << 10))  // Vector extension state
-#define MSTATUS_FS_MASK   ((((cpu_word_t)1) << 13) | (((cpu_word_t)1) << 14)) // Floating-point state
-#define MSTATUS_XS_MASK   ((((cpu_word_t)1) << 15) | (((cpu_word_t)1) << 16)) // Additional extension state
 #define MSTATUS_SD_MASK   (((cpu_word_t)1) << 31)                             // State Dirty summary bit
-
-#define MSTATUS_SIE_MASK  (((cpu_word_t)1) << 1)                              // Supervisor Interrupt Enable
-#define MSTATUS_MIE_MASK  (((cpu_word_t)1) << 3)                              // Machine Interrupt Enable
-#define MSTATUS_SPIE_MASK (((cpu_word_t)1) << 5)                              // Supervisor Previous Interrupt Enable
-#define MSTATUS_MPIE_MASK (((cpu_word_t)1) << 7)                              // Machine Previous Interrupt Enable
-#define MSTATUS_SPP_MASK  (((cpu_word_t)1) << 8)                              // Previous supervisor privilege
-#define MSTATUS_MPP_MASK  ((((cpu_word_t)1) << 11) | (((cpu_word_t)1) << 12)) // Previous machine privilege
-#define MSTATUS_MPRV_MASK (((cpu_word_t)1) << 17)                             // Modify PRiVilege
-#define MSTATUS_SUM_MASK  (((cpu_word_t)1) << 18)                             // Supervisor User Memory access
-#define MSTATUS_MXR_MASK  (((cpu_word_t)1) << 19)                             // Make eXecutable Readable
-#define MSTATUS_TVM_MASK  (((cpu_word_t)1) << 20)                             // Trap Virtual Memory
-#define MSTATUS_TW_MASK   (((cpu_word_t)1) << 21)                             // Timeout Wait
-#define MSTATUS_TSR_MASK  (((cpu_word_t)1) << 22)                             // Trap SRET
 
 #define MSTATUS_WR_VAL(val) ((val) & ~(MSTATUS_WPRI_MASK | MSTATUS_UBE_MASK | MSTATUS_VS_MASK | MSTATUS_FS_MASK | MSTATUS_XS_MASK | MSTATUS_SD_MASK))
 
@@ -246,10 +250,25 @@ typedef enum {
 
 #endif
 
-#define MSTATUS_MPP(mode) (((cpu_word_t)(mode) & 3U) << 11)
+#define MSTATUS_SPP(mode) (((cpu_word_t)(mode) & 1) << 8)
+#define MSTATUS_GET_SPP(mstatus) ((RV_PrivMode)(((mstatus) >> 8) & 1))
+
+#define MSTATUS_MPP(mode) (((cpu_word_t)(mode) & 3) << 11)
 #define MSTATUS_GET_MPP(mstatus) ((RV_PrivMode)(((mstatus) >> 11) & 3))
 
 #define MENVCFG_CBZE_MASK (((cpu_word_t)1) << 7)
+
+#ifdef CONFIG_RV64
+#define SSTATUS_WPRI_MASK ((((cpu_word_t)1) << 0) | (((cpu_word_t)7) << 2) | (((cpu_word_t)1) << 7) | (((cpu_word_t)3) << 11) | (((cpu_word_t)1) << 17) | (((cpu_word_t)7) << 20) | (((cpu_word_t)0x7F) << 25) | (((cpu_word_t)0x1FFFFFFF) << 34))
+#else
+#define SSTATUS_WPRI_MASK ((((cpu_word_t)1) << 0) | (((cpu_word_t)7) << 2) | (((cpu_word_t)1) << 7) | (((cpu_word_t)3) << 11) | (((cpu_word_t)1) << 17) | (((cpu_word_t)7) << 20) | (((cpu_word_t)0x3F) << 25))
+#endif
+
+#define SENVCFG_CBZE_MASK (((cpu_word_t)1) << 7)
+
+#define SCOUNTEREN_TM_MASK (((cpu_word_t)1) << 1)
+
+#define SCOUNTEREN_WR_MASK SCOUNTEREN_TM_MASK
 
 DEFINE_MAX_FUNC(cpu_addr_t);
 DEFINE_MIN_FUNC(cpu_addr_t);

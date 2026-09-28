@@ -6,7 +6,7 @@
 #define ACLINT_H_1EB7E96A572247C5ABBBCD05B33CCB6C
 
 #include "device.h"
-#include "../cpu/rv.h"
+#include "../cpu/rv_types.h"
 
 #define ACLINT_HARTS 1
 
@@ -38,8 +38,10 @@ void aclint_destroy(Aclint *self);
 
 void aclint_tick(Aclint *self, unsigned int cycles);
 
-#define aclint_mtime(self) (*(const uint64_t *)&(self)->mtimer.mtime)
+#define aclint_getMtime(self) (*(const uint64_t *)&(self)->mtimer.mtime)
 
 uint64_t aclint_mtimeRemains(Aclint *self, int hart);
+
+void aclint_setMtimecmp(Aclint *self, int hart, uint64_t val);
 
 #endif //ACLINT_H_1EB7E96A572247C5ABBBCD05B33CCB6C

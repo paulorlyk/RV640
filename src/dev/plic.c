@@ -27,7 +27,7 @@ static void _processInterrupts(Plic *self) {
 
   for(int i = 0; i < PLIC_CONTEXTS; ++i) {
     const int hart = i / PLIC_CONTEXTS_PER_HART;
-    const RV_MCAUSE cause = i % PLIC_CONTEXTS_PER_HART ? MCAUSE_SUPERVISOR_EXT_INT : MCAUSE_MACHINE_EXT_INT;
+    const RV_IrqCause cause = i % PLIC_CONTEXTS_PER_HART ? IRQ_SUPERVISOR_EXT_INT : IRQ_MACHINE_EXT_INT;
 
     if(priority > self->contexts[i].threshold && (self->contexts[i].pendingClaims[irqWord] & irqMask) == 0 && self->contexts[i].enable[irqWord] & irqMask) {
       self->contexts[i].claim = irq;
