@@ -18,6 +18,9 @@ static uint16_t _statusLine[80] = {};
 static uint16_t _pageStatus = ' ';
 static bool _idle = false;
 
+static uint32_t _swapRdKb = 0;
+static uint32_t _swapWrKb = 0;
+
 static void inline _printStatusLine() {
   uint16_t __far *videoMem = __libi86_MK_FP(0xB800, 0);
 
@@ -135,6 +138,34 @@ void ui_page_status(UIPageStatus status) {
   }
 
   _renderPageStatus();
+#endif
+}
+
+void ui_swapRd(int kb) {
+#ifdef CONFIG_DOS
+  _swapRdKb += kb;
+
+  char buf[16] = {0};
+  sprintf(buf, "R: %8" PRIu32 "K", _swapRdKb);
+
+  for(int i = 0; buf[i]; ++i)
+    _statusLine[i + 14] = 9U << 8U | (uint16_t)buf[i];
+
+  _printStatusLine();
+#endif
+}
+
+void ui_swapWr(int kb) {
+#ifdef CONFIG_DOS
+  _swapWrKb += kb;
+
+  char buf[16] = {0};
+  sprintf(buf, "W: %8" PRIu32 "K", _swapWrKb);
+
+  for(int i = 0; buf[i]; ++i)
+    _statusLine[i + 32] = 6U << 8U | (uint16_t)buf[i];
+
+  _printStatusLine();
 #endif
 }
 

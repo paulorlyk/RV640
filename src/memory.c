@@ -116,6 +116,8 @@ static inline void _storePage(Memory* self, struct _memPage *page) {
     ERROR("Mem: Failed to write page to swap");
     return;
   }
+
+  ui_swapWr(MEM_PAGE_SIZE / 1024);
 }
 
 static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _memPage *page) {
@@ -131,6 +133,8 @@ static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _m
 
   page->addr = pageAddr;
   page->dirty = false;
+
+  ui_swapRd(MEM_PAGE_SIZE / 1024);
 }
 
 static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr) {

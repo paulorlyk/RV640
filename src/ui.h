@@ -22,6 +22,8 @@ void ui_cps(uint32_t cps);
 void ui_time(uint64_t ms);
 void ui_idle(bool bIdle);
 void ui_page_status(UIPageStatus status);
+void ui_swapRd(int kb);
+void ui_swapWr(int kb);
 
 char ui_getch();
 void ui_putch(char c);
