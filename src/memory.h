@@ -36,6 +36,8 @@
 #define MEM_PAGE_OFFSET_MASK (MEM_PAGE_SIZE - 1UL)
 #define MEM_PAGE_ADDR_MASK (~MEM_PAGE_OFFSET_MASK)
 
+#define MAX_SWAP_FILES 8
+
 typedef int _dosFileHandle;
 
 #endif
@@ -52,7 +54,9 @@ typedef struct {
   } pages[MEM_PAGES];
   struct _memPage *lruListHead;
 
-  _dosFileHandle swap;
+  _dosFileHandle swapFiles[MAX_SWAP_FILES];
+  unsigned long filePosMask;
+  unsigned int fileNoShift;
 
 #ifdef MEMORY_STATS
   uint32_t pageLookups;
@@ -68,7 +72,7 @@ typedef struct {
 } Memory;
 
 #ifdef CONFIG_DOS
-bool mem_init(Memory* self, cpu_size_t size, const char* swapFile);
+bool mem_init(Memory* self, cpu_size_t size, const char* swapLocation, unsigned int nSwapFiles);
 #else
 bool mem_init(Memory* self, cpu_size_t size);
 #endif

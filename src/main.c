@@ -31,9 +31,11 @@ static struct {
   const char *kernelFile;
   const char *binFile;
 #ifdef CONFIG_DOS
-  const char *swapFile;
+  const char *swapLocation;
+  unsigned int nSwapFiles;
 #endif
   bool noSBI;
+  unsigned int memSizeMb;
 } _opts = {};
 
 static struct {
@@ -190,15 +192,17 @@ static cpu_addr_t _loadBin(const char* fileName, Memory *mem, cpu_addr_t memBase
 
 static bool _parseArgs(int argc, char* argv[]) {
   static const struct option options[] = {
-    { .name = "kernel", .has_arg = required_argument, .flag = 0, .val = 'k' },
-    { .name = "bin",    .has_arg = required_argument, .flag = 0, .val = 'b' },
+    { .name = "kernel",     .has_arg = required_argument, .flag = 0, .val = 'k' },
+    { .name = "bin",        .has_arg = required_argument, .flag = 0, .val = 'b' },
 #ifdef CONFIG_DOS
-    { .name = "swap",   .has_arg = required_argument, .flag = 0, .val = 's' },
+    { .name = "swap",       .has_arg = required_argument, .flag = 0, .val = 's' },
+    { .name = "swap-files", .has_arg = required_argument, .flag = 0, .val = 'n' },
 #endif
-    { .name = "no-sbi", .has_arg = no_argument,       .flag = 0, .val = 1000 },
+    { .name = "no-sbi",     .has_arg = no_argument,       .flag = 0, .val = 1000 },
+    { .name = "mem-size",   .has_arg = required_argument, .flag = 0, .val = 'm' },
     {0},
   };
-  for(int opt; (opt = getopt_long(argc, argv, "k:b:s:", options, NULL)) != -1;) {
+  for(int opt; (opt = getopt_long(argc, argv, "k:b:s:n:m:", options, NULL)) != -1;) {
     switch(opt) {
       case 'k': {
         _opts.kernelFile = optarg;
@@ -212,13 +216,23 @@ static bool _parseArgs(int argc, char* argv[]) {
 
 #ifdef CONFIG_DOS
       case 's': {
-        _opts.swapFile = optarg;
+        _opts.swapLocation = optarg;
+        break;
+      }
+
+      case 'n': {
+        _opts.nSwapFiles = strtoul(optarg, NULL, 10);
         break;
       }
 #endif
 
       case 1000: {
         _opts.noSBI = true;
+        break;
+      }
+
+      case 'm': {
+        _opts.memSizeMb = strtoul(optarg, NULL, 10);
         break;
       }
 
@@ -238,9 +252,21 @@ static bool _parseArgs(int argc, char* argv[]) {
     return false;
   }
 
+  if(_opts.memSizeMb < 1 || _opts.memSizeMb > 1024) {
+    ERROR("Invalid memory size");
+    return false;
+  }
+
 #ifdef CONFIG_DOS
-  if(!_opts.swapFile) {
+  if(!_opts.swapLocation) {
     ERROR("--swap is required");
+    return false;
+  }
+
+  if(_opts.nSwapFiles == 0)
+    _opts.nSwapFiles = 1;
+  if(_opts.nSwapFiles != 1 && _opts.nSwapFiles != 2 && _opts.nSwapFiles != 4 && _opts.nSwapFiles != 8) {
+    ERROR("Invalid number of swap files");
     return false;
   }
 #endif
@@ -254,9 +280,11 @@ static void _usage(const char* exe) {
   INFO("    -k|--kernel Image - kernel image");
   INFO("    -b|--bin image.bin - binary image. Loaded to 0x%" PRI_CPU_PTR, (cpu_addr_t)RAM_BASE);
 #ifdef CONFIG_DOS
-  INFO("    -s|--swap ram.swp - location of the swap file");
+  INFO("    -s|--swap C:\\ - location of the swap file");
+  INFO("    -n|--swap-files 1 - number of swap files. Supported values: 1, 2, 4, 8");
 #endif
   INFO("    --no-sbi - disable SBI, kernel runs in M-mode");
+  INFO("    -m|--mem-size x - RAM size in mega bytes");
 }
 
 static void _vmDestroy() {
@@ -298,9 +326,9 @@ int main(int argc, char* argv[]) {
 
 
 #ifdef CONFIG_DOS
-  if(!mem_init(&_vm.ram, 32LL * 1024 * 1024, _opts.swapFile)) {
+  if(!mem_init(&_vm.ram, _opts.memSizeMb * 1024LL * 1024LL, _opts.swapLocation, _opts.nSwapFiles)) {
 #else
-  if(!mem_init(&_vm.ram, 32LL * 1024 * 1024)) {
+  if(!mem_init(&_vm.ram, _opts.memSizeMb * 1024LL * 1024LL)) {
 #endif
     _vmDestroy();
     return 1;

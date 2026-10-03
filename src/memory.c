@@ -102,17 +102,24 @@ static inline void _swapLruHead(Memory* self, struct _memPage *page) {
   self->lruListHead = page;
 }
 
+static inline _dosFileHandle _lookupSwapFile(Memory* self, unsigned long int pageAddr) {
+  return self->swapFiles[pageAddr >> self->fileNoShift];
+}
+
 static inline void _storePage(Memory* self, struct _memPage *page) {
 #ifdef MEMORY_STATS
   ++self->pageWrites;
 #endif
 
-  if(_dosFSeek(self->swap, (long int)page->addr, DOS_SEEK_SET) != 0) {
+  const _dosFileHandle swap = _lookupSwapFile(self, page->addr);
+  const long int pos = (long int)(page->addr & self->filePosMask);
+
+  if(_dosFSeek(swap, pos, DOS_SEEK_SET) != 0) {
     ERROR("Mem: Failed to seek swap");
     return;
   }
 
-  if(_dosFWrite(self->swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
+  if(_dosFWrite(swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
     ERROR("Mem: Failed to write page to swap");
     return;
   }
@@ -121,12 +128,15 @@ static inline void _storePage(Memory* self, struct _memPage *page) {
 }
 
 static inline void _loadPage(Memory* self, unsigned long int pageAddr, struct _memPage *page) {
-  if(_dosFSeek(self->swap, (long int)pageAddr, DOS_SEEK_SET) != 0) {
+  const _dosFileHandle swap = _lookupSwapFile(self, pageAddr);
+  const long int pos = (long int)(pageAddr & self->filePosMask);
+
+  if(_dosFSeek(swap, pos, DOS_SEEK_SET) != 0) {
     ERROR("Mem: Failed to seek swap");
     return;
   }
 
-  if(_dosFRead(self->swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
+  if(_dosFRead(swap, page->data, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
     ERROR("Mem: Failed to read page from swap");
     return;
   }
@@ -185,14 +195,28 @@ static inline struct _memPage* _lookupPage(Memory* self, unsigned long int addr)
 #endif
 
 #ifdef CONFIG_DOS
-bool mem_init(Memory* self, cpu_size_t size, const char* swapFile)
+bool mem_init(Memory* self, cpu_size_t size, const char* swapLocation, unsigned int nSwapFiles)
 #else
 bool mem_init(Memory* self, cpu_size_t size)
 #endif
 {
+  memset(self, 0, sizeof(*self));
+
   INFO("Mem: size = %" PRI_CPU_SIZE, size);
 
 #ifdef CONFIG_DOS
+  bool nSwFilesValid = false;
+  for(unsigned int i = 1; i <= MAX_SWAP_FILES; i <<= 1) {
+    if(nSwapFiles == i) {
+      nSwFilesValid = true;
+      break;
+    }
+  }
+  if(!nSwFilesValid) {
+    ERROR("Mem: Invalid number of swap files");
+    return false;
+  }
+
   INFO("Mem: Allocating %d x %lu byte pages", MEM_PAGES, MEM_PAGE_SIZE);
 
   for(int i = 0; i < MEM_PAGES; ++i) {
@@ -206,40 +230,57 @@ bool mem_init(Memory* self, cpu_size_t size)
     _fmemset(self->pages[i].data, 0, MEM_PAGE_SIZE);
   }
 
-  INFO("Mem: Initializing swap file %s", swapFile);
+  const unsigned long nFileSize = ALIGN_UP(size / nSwapFiles, MEM_PAGE_SIZE);
 
-  self->swap = _dosFOpen(swapFile);
-  if(self->swap < 0) {
-    ERROR("Failed to create swap file");
-    mem_destroy(self);
-    return false;
+  self->filePosMask = 0;
+  self->fileNoShift = 0;
+  for(unsigned long n = nFileSize; (n & 1) == 0; n >>= 1) {
+    self->filePosMask = (self->filePosMask << 1) | 1;
+    ++self->fileNoShift;
   }
 
-  _dosFSeek(self->swap, 0, DOS_SEEK_END);
-  long int swapPos = _dosFTell(self->swap);
+  INFO("Mem: Initializing swap files at %s", swapLocation);
 
-  for(int n = 0; swapPos < size; swapPos += MEM_PAGE_SIZE) {
-    char buf[MEM_PAGE_SIZE] = {0};
+  for(int i = 0; i < MAX_SWAP_FILES; ++i)
+    self->swapFiles[i] = -1;
 
-    if(_dosFWrite(self->swap, buf, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
-      ERROR("Failed to write swap file");
+  for(int i = 0; i < nSwapFiles; ++i) {
+    char fileName[256];
+    sprintf(fileName, "%s\\ram%02d.swp", swapLocation, i);
+
+    INFO("Mem: Initializing file: %s", fileName);
+
+    self->swapFiles[i] = _dosFOpen(fileName);
+    if(self->swapFiles[i] < 0) {
+      ERROR("Failed to create swap file %s", fileName);
       mem_destroy(self);
       return false;
     }
 
-    if((n++ % 256) == 0)
-      INFO("Mem: Swap size: %ld bytes", swapPos);
-  }
+    _dosFSeek(self->swapFiles[i], 0, DOS_SEEK_END);
+    long int swapPos = _dosFTell(self->swapFiles[i]);
 
-  _dosFClose(self->swap);
-  self->swap = _dosFOpen(swapFile);
-  if(self->swap < 0) {
-    ERROR("Failed reopen swap file");
-    mem_destroy(self);
-    return false;
-  }
+    for(int n = 0; swapPos < nFileSize; swapPos += MEM_PAGE_SIZE) {
+      char buf[MEM_PAGE_SIZE] = {0};
 
-  INFO("Mem: Swap initialized: %ld  bytes", swapPos);
+      if(_dosFWrite(self->swapFiles[i], buf, MEM_PAGE_SIZE) != MEM_PAGE_SIZE) {
+        ERROR("Failed to write swap file %s", fileName);
+        mem_destroy(self);
+        return false;
+      }
+
+      if((n++ % 256) == 0)
+        INFO("Mem: Size: %ld bytes", swapPos);
+    }
+
+    _dosFClose(self->swapFiles[i]);
+    self->swapFiles[i] = _dosFOpen(fileName);
+    if(self->swapFiles[i] < 0) {
+      ERROR("Failed reopen swap file %s", fileName);
+      mem_destroy(self);
+      return false;
+    }
+  }
 
   for(int i = 0; i < MEM_PAGES; ++i) {
     ui_page_status(UI_PS_RD);
@@ -271,14 +312,16 @@ bool mem_init(Memory* self, cpu_size_t size)
 void mem_destroy(Memory *self) {
 #ifdef CONFIG_DOS
   for(int i = 0; i < MEM_PAGES; ++i) {
-    if(self->swap)
+    if(self->fileNoShift && (_lookupSwapFile(self, (self->pages + i)->addr) >= 0))
       _storePage(self, self->pages + i);
 
     _ffree(self->pages[i].data);
   }
 
-  if(self->swap >= 0)
-    _dosFClose(self->swap);
+  for(int i = 0; i < MAX_SWAP_FILES; ++i) {
+    if(self->swapFiles[i] >= 0)
+      _dosFClose(self->swapFiles[i]);
+  }
 
 #ifdef MEMORY_STATS
   DEBUG("Mem stats:\n\tpageLookups:\t%" PRIu32 "\n\tpageHits:\t%" PRIu32 "\n\tpageMisses:\t%" PRIu32 "\n\tpageWrites:\t%" PRIu32,
