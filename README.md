@@ -43,7 +43,11 @@ cd linux
 cd dos
 RV640 --swap ram.swp --kernel ../Image
 ```
-Swap file contains the entire RAM of the guest VM. It will be created/resized automatically. The faster the underlying storage - the better.
+Swap file(s) contains the entire RAM of the guest VM. It will be created/resized automatically. The faster the underlying storage - the better.
+
+You may want to use `ANSI.SYS` or alternatives to parse terminal escape codes. Add `DEVICE=C:\PATH\TO\ANSI.SYS` to your `CONFIG.SYS`.
+Raw escape commands will be printed without it.
+In case you do not want to load `ANASI.SYS` - tell Linux that you are using a typewriter by entering `export TERM=dumb` into the console.
 
 RV64 VM executes 750-1000 IPS on average on 8086 @ 4.77MHz. Be prepared to wait for several days for a login prompt.
 The experience is not very interactive. There will be a (extremely) delayed feedback while typing.

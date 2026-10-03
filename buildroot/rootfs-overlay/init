@@ -14,7 +14,7 @@ if (exec 0</dev/console) 2>/dev/null; then
     exec 2>/dev/console
 fi
 
-export TERM=dumb
+export TERM=ansi
 export HOME=/root
 
 while true; do
