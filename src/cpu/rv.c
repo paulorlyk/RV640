@@ -7,7 +7,7 @@
 #include "../log.h"
 
 #include "rv_internal.h"
-#include "rv_instr.h"
+#include "rv_base.h"
 #include "rv_cext.h"
 
 #include "../sbi.h"
