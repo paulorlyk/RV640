@@ -9,6 +9,43 @@
 
 #include "rv_internal.h"
 
+static inline void _writeMstatus(RV_Cpu *self, cpu_word_t val) {
+  if((self->csr.mstatus & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)) != (val & (MSTATUS_MIE_MASK | MSTATUS_SIE_MASK)))
+    _pendingIRQ(self);
+
+  RV_PrivMode mpp = MSTATUS_GET_MPP(val);
+  if(mpp != RV_PRIV_MODE_USER && mpp != RV_PRIV_MODE_SUPERVISOR)
+    mpp = RV_PRIV_MODE_MACHINE;
+
+  self->csr.mstatus = (MSTATUS_WR_VAL(val) & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(mpp);
+}
+
+static inline void _writeMie(RV_Cpu *self, cpu_word_t val) {
+  const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
+  if(self->csr.mie != newMie)
+    _pendingIRQ(self);
+
+  self->csr.mie = newMie;
+}
+
+static inline void _writeMip(RV_Cpu *self, cpu_word_t val) {
+  const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
+  if(self->csr.mip != newMip)
+    _pendingIRQ(self);
+
+  self->csr.mip = newMip;
+}
+
+static inline bool _checkPrfCounterAccess(RV_Cpu *self, cpu_word_t mask) {
+  if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.mcounteren & mask))
+    return false;
+
+  if(self->mode < RV_PRIV_MODE_SUPERVISOR && !(self->csr.scounteren & mask))
+    return false;
+
+  return true;
+}
+
 static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
   // Reading CSRs can have side effects
   if(self->trap)
@@ -51,6 +88,9 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     // SIP
     case 0x144: return self->csr.mip & self->csr.mideleg & SIP_RW_MASK;
 
+    // SATP
+    case 0x180: return 0;
+
     // MSTATUS
     case 0x300: return self->csr.mstatus;
 
@@ -82,6 +122,9 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     // MTVEC
     case 0x305: return self->csr.mtvec;
 
+    // MCOUNTEREN
+    case 0x306: return self->csr.mcounteren;
+
     // MENVCFG
     case 0x30A: return self->csr.menvcfg;
 
@@ -105,21 +148,53 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     // MIP
     case 0x344: return self->csr.mip;
 
+    // CYCLE
+    case 0xC00: {
+      if(!_checkPrfCounterAccess(self, COUNTEREN_CY_MASK))
+        break;
+
+      return 0;
+    }
+
     // TIME
     case 0xC01: {
-      if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.scounteren & SCOUNTEREN_TM_MASK))
+      if(!_checkPrfCounterAccess(self, COUNTEREN_TM_MASK))
         break;
 
       return aclint_getMtime(self->aclint);
     }
 
+    // INSTRET
+    case 0xC02: {
+      if(!_checkPrfCounterAccess(self, COUNTEREN_IR_MASK))
+        break;
+
+      return 0;
+    }
+
 #ifndef CONFIG_RV64
+    // CYCLEH
+    case 0xC80: {
+      if(!_checkPrfCounterAccess(self, COUNTEREN_CY_MASK))
+        break;
+
+      return 0;
+    }
+
     // TIMEH
     case 0xC81: {
-      if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.scounteren & SCOUNTEREN_TM_MASK))
+      if(!_checkPrfCounterAccess(self, COUNTEREN_TM_MASK))
         break;
 
       return aclint_getMtime(self->aclint) >> 32;
+    }
+
+    // INSTRETH
+    case 0xC82: {
+      if(!_checkPrfCounterAccess(self, COUNTEREN_IR_MASK))
+        break;
+
+      return 0;
     }
 #endif
 
@@ -175,7 +250,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x106: {
       // SCOUNTEREN
-      self->csr.scounteren = val & SCOUNTEREN_WR_MASK;
+      self->csr.scounteren = val & COUNTEREN_WR_MASK;
       break;
     }
 
@@ -241,6 +316,12 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     case 0x305: {
       // MTVEC
       self->csr.mtvec = val;
+      break;
+    }
+
+    case 0x306: {
+      // MCOUNTEREN
+      self->csr.mcounteren = val & COUNTEREN_WR_MASK;
       break;
     }
 

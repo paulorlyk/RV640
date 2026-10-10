@@ -67,21 +67,22 @@ typedef struct RV_Cpu_struct {
   cpu_addr_t PC;
 
   struct {
-    cpu_word_t mhartid;   // Hart ID Register
-    cpu_word_t mip;       // Machine Interrupt-Pending
-    cpu_word_t mie;       // Machine Interrupt-Enable
-    cpu_word_t mscratch;  // Machine Scratch Register
-    cpu_word_t mstatus;   // Machine Status Register
+    cpu_word_t mhartid;     // Hart ID Register
+    cpu_word_t mip;         // Machine Interrupt-Pending
+    cpu_word_t mie;         // Machine Interrupt-Enable
+    cpu_word_t mscratch;    // Machine Scratch Register
+    cpu_word_t mstatus;     // Machine Status Register
 #ifndef CONFIG_RV64
-    cpu_word_t mstatush;  // Additional Machine Status Register
+    cpu_word_t mstatush;    // Additional Machine Status Register
 #endif
-    cpu_word_t mtvec;     // Machine Trap-Vector Base-Address
-    cpu_word_t mcause;    // Machine Cause
-    cpu_word_t mepc;      // Machine Exception Program Counter Register
-    cpu_word_t mtval;     // Machine Trap Value Register
-    cpu_word_t menvcfg;   // Machine Environment Configuration Register
-    cpu_word_t medeleg;   // Machine Trap Delegation Register
-    cpu_word_t mideleg;   // Machine Interrupt Delegation Register
+    cpu_word_t mtvec;       // Machine Trap-Vector Base-Address
+    cpu_word_t mcause;      // Machine Cause
+    cpu_word_t mepc;        // Machine Exception Program Counter Register
+    cpu_word_t mtval;       // Machine Trap Value Register
+    cpu_word_t menvcfg;     // Machine Environment Configuration Register
+    cpu_word_t medeleg;     // Machine Trap Delegation Register
+    cpu_word_t mideleg;     // Machine Interrupt Delegation Register
+    cpu_word_t mcounteren;  // Machine Counter-Enable Register
 
     cpu_word_t sscratch;    // Supervisor Scratch Register
     cpu_word_t stvec;       // Supervisor Trap-Vector Base-Address

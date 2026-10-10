@@ -290,9 +290,11 @@ typedef enum {
 
 #define SENVCFG_CBZE_MASK (((cpu_word_t)1) << 7)
 
-#define SCOUNTEREN_TM_MASK (((cpu_word_t)1) << 1)
+#define COUNTEREN_CY_MASK (((cpu_word_t)1) << 0)
+#define COUNTEREN_TM_MASK (((cpu_word_t)1) << 1)
+#define COUNTEREN_IR_MASK (((cpu_word_t)1) << 2)
 
-#define SCOUNTEREN_WR_MASK SCOUNTEREN_TM_MASK
+#define COUNTEREN_WR_MASK (COUNTEREN_CY_MASK | COUNTEREN_TM_MASK | COUNTEREN_IR_MASK)
 
 DEFINE_MAX_FUNC(cpu_addr_t);
 DEFINE_MIN_FUNC(cpu_addr_t);

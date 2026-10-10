@@ -139,6 +139,7 @@ void sbi_startHart(RV_Cpu *hart, cpu_addr_t entryPoint, cpu_word_t a1) {
 
   hart->csr.medeleg = CPU_UINT_MAX & ~(((cpu_word_t)1 << (unsigned int)TRAP_CALL_S) | ((cpu_word_t)1 << (unsigned int)TRAP_CALL_M) | ((cpu_word_t)1 << (unsigned int)TRAP_DOUBLE_TRAP));
   hart->csr.mideleg = CPU_UINT_MAX & ~(((cpu_word_t)1 << (unsigned int)IRQ_MACHINE_SW_INT) | ((cpu_word_t)1 << (unsigned int)IRQ_MACHINE_TMR_INT) | ((cpu_word_t)1 << (unsigned int)IRQ_MACHINE_EXT_INT));
+  hart->csr.mcounteren = COUNTEREN_WR_MASK;
 }
 
 void sbi_handleEcall(RV_Cpu *hart) {
