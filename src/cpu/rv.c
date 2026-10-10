@@ -58,25 +58,10 @@ static inline void _processPendingSInterrupts(RV_Cpu *self) {
     for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
       if(masks[i] & interrupts) {
         const bool delegated = self->csr.mideleg & masks[i];
-        if(!delegated) {
-          _interrupt(self, vectors[i], false);
-          break;
-        }
 
-        if(self->mode <= RV_PRIV_MODE_USER) {
-          _interrupt(self, vectors[i], true);
-          break;
-        }
-
-        if(self->mode == RV_PRIV_MODE_SUPERVISOR) {
-          if(sie) {
-            _interrupt(self, vectors[i], true);
-            break;
-          }
-        }
-
-        if(self->mode == RV_PRIV_MODE_MACHINE && !sie) {
-          _interrupt(self, vectors[i], true);
+        const bool irq = !delegated || ((self->mode < RV_PRIV_MODE_SUPERVISOR) || (self->mode == RV_PRIV_MODE_SUPERVISOR && sie) || (self->mode == RV_PRIV_MODE_MACHINE && !sie));
+        if(irq) {
+          _interrupt(self, vectors[i], delegated);
           break;
         }
       }
