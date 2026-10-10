@@ -64,7 +64,7 @@ static inline void _doSYSTEM(RV_Cpu* self, unsigned int funct3, uint32_t iimm, u
 
         case 0x105: {
           // WFI
-          if(self->mode != RV_PRIV_MODE_MACHINE && self->csr.mstatus & MSTATUS_TW_MASK) {
+          if((self->mode < RV_PRIV_MODE_MACHINE && (self->csr.mstatus & MSTATUS_TW_MASK)) || (self->mode == RV_PRIV_MODE_USER)) {
             _trap(self, TRAP_INST_ILL);
             break;
           }
