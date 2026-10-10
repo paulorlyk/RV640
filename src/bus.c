@@ -94,6 +94,8 @@ bool bus_reservationCheckInvalidate(Bus *self, cpu_addr_t addr, size_t size) {
   return _includes(self->reservation.addr, self->reservation.size, addr, size);
 }
 
+#ifndef CONFIG_DOS
+
 bool bus_dump(Bus *self, cpu_addr_t addr, size_t size) {
   uint8_t *mem = malloc(size);
   if(!mem || !bus_read(self, addr, mem, size)) {
@@ -101,7 +103,7 @@ bool bus_dump(Bus *self, cpu_addr_t addr, size_t size) {
     return false;
   }
 
-  uint8_t *memPtr = mem;
+  const uint8_t *memPtr = mem;
   for(size_t printed = 0; printed < size;) {
     const size_t lineBytes = 16;
 
@@ -131,3 +133,6 @@ bool bus_dump(Bus *self, cpu_addr_t addr, size_t size) {
   free(mem);
   return true;
 }
+
+#endif
+

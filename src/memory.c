@@ -412,6 +412,8 @@ int mem_cmp(Memory *self, cpu_addr_t addr, const void *buf, size_t size) {
 #endif
 }
 
+#ifndef CONFIG_DOS
+
 bool mem_dumpImage(Memory *self, const char *imgFile) {
   FILE *f = fopen(imgFile, "wb");
   if(!f)
@@ -432,3 +434,5 @@ bool mem_dumpImage(Memory *self, const char *imgFile) {
 
   return true;
 }
+
+#endif

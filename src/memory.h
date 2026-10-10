@@ -86,6 +86,8 @@ void mem_read(Memory *self, cpu_addr_t addr, void* buf, size_t size);
 void mem_write(Memory *self, cpu_addr_t addr, const void* buf, size_t size);
 int mem_cmp(Memory *self, cpu_addr_t addr, const void* buf, size_t size);
 
+#ifndef CONFIG_DOS
 bool mem_dumpImage(Memory *self, const char* imgFile);
+#endif
 
 #endif //MEMORY_H_CF2C5830AD314A74AB2FF51D5723BE8C

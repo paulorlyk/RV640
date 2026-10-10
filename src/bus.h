@@ -34,6 +34,8 @@ bool bus_write(Bus *self, cpu_addr_t addr, const void* buf, size_t size);
 void bus_reservationCreate(Bus *self, cpu_addr_t addr, size_t size);
 bool bus_reservationCheckInvalidate(Bus *self, cpu_addr_t addr, size_t size);
 
+#ifndef CONFIG_DOS
 bool bus_dump(Bus *self, cpu_addr_t addr, size_t size);
+#endif
 
 #endif //BUS_H_0850D3B6569F4E7090F9D9D4188FB66A
