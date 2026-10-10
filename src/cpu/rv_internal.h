@@ -84,12 +84,17 @@ static inline void _writeMstatus(RV_Cpu *self, cpu_word_t val) {
 }
 
 static inline void _xret(RV_Cpu *self, RV_PrivMode mode, int instSize) {
-  if(self->mode != mode) {
+  if(self->mode < mode) {
     _trap(self, TRAP_INST_ILL);
     return;
   }
 
-  if(self->mode == RV_PRIV_MODE_SUPERVISOR) {
+  if(self->mode == RV_PRIV_MODE_SUPERVISOR && mode == RV_PRIV_MODE_SUPERVISOR && (self->csr.mstatus & MSTATUS_TSR_MASK)) {
+    _trap(self, TRAP_INST_ILL);
+    return;
+  }
+
+  if(mode == RV_PRIV_MODE_SUPERVISOR) {
     // Restore SIE
     self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_SIE_MASK) | ((self->csr.mstatus & MSTATUS_SPIE_MASK) ? MSTATUS_SIE_MASK : 0) | MSTATUS_SPIE_MASK;
   } else {
@@ -98,15 +103,16 @@ static inline void _xret(RV_Cpu *self, RV_PrivMode mode, int instSize) {
   }
 
   // Restore privilege mode
-  if(self->mode == RV_PRIV_MODE_SUPERVISOR) {
+  if(mode == RV_PRIV_MODE_SUPERVISOR) {
     self->mode = MSTATUS_GET_SPP(self->csr.mstatus);
     self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_SPP_MASK) | MSTATUS_SPP(RV_PRIV_MODE_USER);
   } else {
     self->mode = MSTATUS_GET_MPP(self->csr.mstatus);
     self->csr.mstatus = (self->csr.mstatus & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(RV_PRIV_MODE_USER);
-    if(self->mode != RV_PRIV_MODE_MACHINE)
-      self->csr.mstatus &= ~MSTATUS_MPRV_MASK;
   }
+
+  if(self->mode <= RV_PRIV_MODE_SUPERVISOR)
+    self->csr.mstatus &= ~MSTATUS_MPRV_MASK;
 
   _writePC(self, (mode == RV_PRIV_MODE_SUPERVISOR ? self->csr.sepc : self->csr.mepc) - instSize);
 }
