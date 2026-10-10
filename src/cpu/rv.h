@@ -83,8 +83,6 @@ typedef struct RV_Cpu_struct {
     cpu_word_t medeleg;   // Machine Trap Delegation Register
     cpu_word_t mideleg;   // Machine Interrupt Delegation Register
 
-    cpu_word_t sip;         // Supervisor Interrupt-Pending
-    cpu_word_t sie;         // Supervisor Interrupt-Enable
     cpu_word_t sscratch;    // Supervisor Scratch Register
     cpu_word_t stvec;       // Supervisor Trap-Vector Base-Address
     cpu_word_t scause;      // Supervisor Cause

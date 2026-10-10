@@ -51,15 +51,34 @@ static inline void _processPendingSInterrupts(RV_Cpu *self) {
     (cpu_word_t)1 << (unsigned int)IRQ_CTR_OVF_INT,
   };
 
-  const cpu_word_t mInterrupts = self->csr.mip & self->csr.mie;
-  const cpu_word_t sInterrupts = self->csr.sip & self->csr.sie;
-  if(mInterrupts || sInterrupts) {
-    const bool ie = self->csr.mstatus & MSTATUS_SIE_MASK;
+  const cpu_word_t interrupts = self->csr.mip & self->csr.mie;
+  if(interrupts) {
+    const bool sie = self->csr.mstatus & MSTATUS_SIE_MASK;
+
     for(int i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
-      const bool delegate = self->csr.mideleg & self->csr.sie & masks[i];
-      if(masks[i] & ((ie && delegate) ? sInterrupts : mInterrupts)) {
-        _interrupt(self, vectors[i], delegate);
-        break;
+      if(masks[i] & interrupts) {
+        const bool delegated = self->csr.mideleg & masks[i];
+        if(!delegated) {
+          _interrupt(self, vectors[i], false);
+          break;
+        }
+
+        if(self->mode <= RV_PRIV_MODE_USER) {
+          _interrupt(self, vectors[i], true);
+          break;
+        }
+
+        if(self->mode == RV_PRIV_MODE_SUPERVISOR) {
+          if(sie) {
+            _interrupt(self, vectors[i], true);
+            break;
+          }
+        }
+
+        if(self->mode == RV_PRIV_MODE_MACHINE && !sie) {
+          _interrupt(self, vectors[i], true);
+          break;
+        }
       }
     }
   }
@@ -248,7 +267,6 @@ void rv_setInterrupt(RV_Cpu *self, RV_IrqCause n) {
   const cpu_word_t mask = (cpu_word_t)1 << n;
 
   self->csr.mip |= mask;
-  self->csr.sip |= mask & SIP_RW_MASK;
 
   _pendingIRQ(self);
 }
@@ -257,5 +275,4 @@ void rv_clearInterrupt(RV_Cpu *self, RV_IrqCause n) {
   const cpu_word_t mask = (cpu_word_t)1 << n;
 
   self->csr.mip &= ~mask;
-  self->csr.sip &= ~(mask & SIP_RW_MASK);
 }

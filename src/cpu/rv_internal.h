@@ -83,6 +83,22 @@ static inline void _writeMstatus(RV_Cpu *self, cpu_word_t val) {
   self->csr.mstatus = (MSTATUS_WR_VAL(val) & ~MSTATUS_MPP_MASK) | MSTATUS_MPP(mpp);
 }
 
+static inline void _writeMie(RV_Cpu *self, cpu_word_t val) {
+  const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
+  if(self->csr.mie != newMie)
+    _pendingIRQ(self);
+
+  self->csr.mie = newMie;
+}
+
+static inline void _writeMip(RV_Cpu *self, cpu_word_t val) {
+  const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
+  if(self->csr.mip != newMip)
+    _pendingIRQ(self);
+
+  self->csr.mip = newMip;
+}
+
 static inline void _xret(RV_Cpu *self, RV_PrivMode mode, int instSize) {
   if(self->mode < mode) {
     _trap(self, TRAP_INST_ILL);

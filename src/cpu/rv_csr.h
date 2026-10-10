@@ -25,7 +25,7 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     case 0x100: return self->csr.mstatus & ~SSTATUS_WPRI_MASK;
 
     // SIE
-    case 0x104: return self->csr.sie;
+    case 0x104: return self->csr.mie & self->csr.mideleg & SIE_RW_MASK;
 
     // STVEC
     case 0x105: return self->csr.stvec;
@@ -49,7 +49,7 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
     case 0x143: return self->csr.stval;
 
     // SIP
-    case 0x144: return self->csr.sip;
+    case 0x144: return self->csr.mip & self->csr.mideleg & SIP_RW_MASK;
 
     // MSTATUS
     case 0x300: return self->csr.mstatus;
@@ -113,7 +113,7 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
       return aclint_getMtime(self->aclint);
     }
 
-#ifndef CONFIG_RV64s
+#ifndef CONFIG_RV64
     // TIMEH
     case 0xC81: {
       if(self->mode < RV_PRIV_MODE_MACHINE && !(self->csr.scounteren & SCOUNTEREN_TM_MASK))
@@ -162,11 +162,8 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x104: {
       // SIE
-      const cpu_word_t newSie = (self->csr.sie & ~SIE_RW_MASK) | (val & SIE_RW_MASK);
-      if(self->csr.sie != newSie)
-        _pendingIRQ(self);
-
-      self->csr.sie = newSie;
+      const cpu_word_t mask = self->csr.mideleg & SIE_RW_MASK;
+      _writeMie(self, (val & mask) | (self->csr.mie & ~mask));
       break;
     }
 
@@ -208,11 +205,8 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x144: {
       // SIP
-      const cpu_word_t newSip = (self->csr.mip & ~SIP_RW_MASK) | (val & SIP_RW_MASK);
-      if(self->csr.sip != newSip)
-        _pendingIRQ(self);
-
-      self->csr.sip = newSip;
+      const cpu_word_t mask = self->csr.mideleg & SIP_RW_MASK;
+      _writeMip(self, (val & mask) | (self->csr.mip & ~mask));
       break;
     }
 
@@ -240,11 +234,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x304: {
       // MIE
-      const cpu_word_t newMie = (self->csr.mie & ~MIE_RW_MASK) | (val & MIE_RW_MASK);
-      if(self->csr.mie != newMie)
-        _pendingIRQ(self);
-
-      self->csr.mie = newMie;
+      _writeMie(self, val);
       break;
     }
 
@@ -288,11 +278,7 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
 
     case 0x344: {
       // MIP
-      const cpu_word_t newMip = (self->csr.mip & ~MIP_RW_MASK) | (val & MIP_RW_MASK);
-      if(self->csr.mip != newMip)
-        _pendingIRQ(self);
-
-      self->csr.mip = newMip;
+      _writeMip(self, val);
       break;
     }
 
