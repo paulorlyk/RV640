@@ -9,7 +9,7 @@
 
 #include <stdbool.h>
 
-#define BUS_MAX_DEVICES 8
+#define BUS_MAX_DEVICES 4
 
 typedef struct {
   struct _busDevice {
