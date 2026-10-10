@@ -314,11 +314,6 @@ int main(int argc, char* argv[]) {
 
   static RV_Cpu *harts[] = { &_vm.cpu };
 
-  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, ACLINT_BASE, aclint_device(&_vm.aclint))) {
-    _vmDestroy();
-    return 1;
-  }
-
   if(!rv_init(&_vm.cpu, &_vm.bus, &_vm.aclint, 0, !_opts.noSBI)) {
     _vmDestroy();
     return 1;
@@ -335,6 +330,11 @@ int main(int argc, char* argv[]) {
   }
 
   if(!bus_register(&_vm.bus, RAM_BASE, mem_device(&_vm.ram))) {
+    _vmDestroy();
+    return 1;
+  }
+
+  if(!aclint_init(&_vm.aclint, harts) || !bus_register(&_vm.bus, ACLINT_BASE, aclint_device(&_vm.aclint))) {
     _vmDestroy();
     return 1;
   }
