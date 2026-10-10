@@ -202,6 +202,30 @@ typedef enum {
   | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
   )
 
+#define MEDELEG_RW_MASK  ( \
+    (((cpu_word_t)1) << (unsigned int)TRAP_INST_ALLIGN) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_INST_AF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_INST_ILL) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_BREAKPOINT) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_LD_AF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_ST_ALLIGN) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_ST_AF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_CALL_U) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_CALL_S) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_INST_PF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_LD_PF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_ST_PF) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_SW_CHECK) \
+  | (((cpu_word_t)1) << (unsigned int)TRAP_HW_ERR) \
+  )
+
+#define MIDELEG_RW_MASK  ( \
+    (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_SW_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_TMR_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_SUPERVISOR_EXT_INT) \
+  | (((cpu_word_t)1) << (unsigned int)IRQ_CTR_OVF_INT) \
+  )
+
 #define MSTATUS_UBE_MASK  (((cpu_word_t)1) << 6)                              // User-mode endianness
 #define MSTATUS_VS_MASK   ((((cpu_word_t)1) << 9) | (((cpu_word_t)1) << 10))  // Vector extension state
 #define MSTATUS_FS_MASK   ((((cpu_word_t)1) << 13) | (((cpu_word_t)1) << 14)) // Floating-point state

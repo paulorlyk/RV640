@@ -70,6 +70,12 @@ static inline cpu_word_t _readCSR(RV_Cpu *self, uint16_t csr) {
         | MISA_EXT_BIT('u');
     }
 
+    // MEDELEG
+    case 0x302: return self->csr.medeleg;
+
+    // MIDELEG
+    case 0x303: return self->csr.mideleg;
+
     // MIE
     case 0x304: return self->csr.mie;
 
@@ -219,6 +225,18 @@ static inline void _writeCSR(RV_Cpu *self, uint16_t csr, cpu_word_t val) {
     // MISA
     case 0x301:
       break;
+
+    // MEDELEG
+    case 0x302: {
+      self->csr.medeleg = val & MEDELEG_RW_MASK;
+      break;
+    }
+
+    // MIDELEG
+    case 0x303: {
+      self->csr.mideleg = val & MIDELEG_RW_MASK;
+      break;
+    }
 
     case 0x304: {
       // MIE
