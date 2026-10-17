@@ -55,9 +55,9 @@ FROM base AS build-linux
 
 WORKDIR /build
 
-RUN wget "https://buildroot.org/downloads/buildroot-2026.05.1.tar.gz" && \
-    tar -xzvf buildroot-2026.05.1.tar.gz && \
-    mv buildroot-2026.05.1 buildroot
+RUN wget "https://buildroot.org/downloads/buildroot-2026.05.3.tar.gz" && \
+    tar -xzvf buildroot-2026.05.3.tar.gz && \
+    mv buildroot-2026.05.3 buildroot
 
 COPY buildroot/ .
 
