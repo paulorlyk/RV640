@@ -12,31 +12,36 @@
 #include <conio.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <dos.h>
 
-static uint16_t _statusLine[80] = {};
+static struct {
+  uint16_t statusLine[80];
 
-static uint16_t _pageStatus = ' ';
-static bool _idle = false;
+  uint16_t pageStatus;
+  bool idle;
 
-static uint32_t _swapRdKb = 0;
-static uint32_t _swapWrKb = 0;
+  uint32_t swapRdKb;
+  uint32_t swapWrKb;
 
-static void inline _printStatusLine() {
+  Ns16550a *uart;
+} _ui;
+
+static inline void _printStatusLine() {
   uint16_t __far *videoMem = __libi86_MK_FP(0xB800, 0);
 
-  _fmemcpy(videoMem, _statusLine, sizeof(_statusLine));
+  _fmemcpy(videoMem, _ui.statusLine, sizeof(_ui.statusLine));
 }
 
-static void inline _pokeVideoMem(int offset, uint16_t data) {
+static inline void _pokeVideoMem(int offset, uint16_t data) {
   uint16_t __far *videoMem = __libi86_MK_FP(0xB800, 0);
 
   *(videoMem + offset) = data;
 }
 
 static inline void _renderPageStatus() {
-  const uint16_t d = _idle ? ' ' : _pageStatus;
+  const uint16_t d = _ui.idle ? ' ' : _ui.pageStatus;
 
-  _statusLine[0] = d;
+  _ui.statusLine[0] = d;
   _pokeVideoMem(0, d);
 }
 
@@ -49,12 +54,24 @@ static inline void _renderPageStatus() {
 
 static struct {
   struct termios tio;
+
+  Ns16550a *uart;
 } _ui;
 
 #endif
 
-void ui_init() {
-#ifndef CONFIG_DOS
+void ui_init(Ns16550a *uart) {
+  _ui.uart = uart;
+
+#ifdef CONFIG_DOS
+  memset(_ui.statusLine, 0, sizeof(_ui.statusLine));
+
+  _ui.pageStatus = ' ';
+  _ui.idle = false;
+
+  _ui.swapRdKb = 0;
+  _ui.swapWrKb = 0;
+#else
   tcgetattr(STDIN_FILENO, &_ui.tio);
 
   struct termios tio = _ui.tio;
@@ -87,7 +104,7 @@ void ui_cps(uint32_t cps) {
   sprintf(buf, "%8" PRIu32, cps);
 
   for(int i = 0; buf[i]; ++i)
-    _statusLine[80 - 8 + i] = 2U << 8U | (uint16_t)buf[i];
+    _ui.statusLine[80 - 8 + i] = 2U << 8U | (uint16_t)buf[i];
 
   _printStatusLine();
 #endif
@@ -106,7 +123,7 @@ void ui_time(uint64_t ms) {
   sprintf(buf, "%5u:%02u:%02u", h, m, s);
 
   for(int i = 0; buf[i]; ++i)
-    _statusLine[i + 1] = 3U << 8U | (uint16_t)buf[i];
+    _ui.statusLine[i + 1] = 3U << 8U | (uint16_t)buf[i];
 
   _printStatusLine();
 #endif
@@ -114,7 +131,7 @@ void ui_time(uint64_t ms) {
 
 void ui_idle(bool bIdle) {
 #ifdef CONFIG_DOS
-  _idle = bIdle;
+  _ui.idle = bIdle;
 
   _renderPageStatus();
 #endif
@@ -125,15 +142,15 @@ void ui_page_status(UIPageStatus status) {
   switch(status) {
     default:
     case UI_PS_IDLE:
-      _pageStatus = 2U << 12U | (unsigned int)' ';
+      _ui.pageStatus = 2U << 12U | (unsigned int)' ';
       break;
 
     case UI_PS_RD:
-      _pageStatus = 1U << 12U | (unsigned int)' ';
+      _ui.pageStatus = 1U << 12U | (unsigned int)' ';
       break;
 
     case UI_PS_WR:
-      _pageStatus = 4U << 12U | (unsigned int)' ';
+      _ui.pageStatus = 4U << 12U | (unsigned int)' ';
       break;
   }
 
@@ -143,13 +160,13 @@ void ui_page_status(UIPageStatus status) {
 
 void ui_swapRd(int kb) {
 #ifdef CONFIG_DOS
-  _swapRdKb += kb;
+  _ui.swapRdKb += kb;
 
   char buf[16] = {0};
-  sprintf(buf, "R: %8" PRIu32 "K", _swapRdKb);
+  sprintf(buf, "R: %8" PRIu32 "K", _ui.swapRdKb);
 
   for(int i = 0; buf[i]; ++i)
-    _statusLine[i + 14] = 9U << 8U | (uint16_t)buf[i];
+    _ui.statusLine[i + 14] = 9U << 8U | (uint16_t)buf[i];
 
   _printStatusLine();
 #endif
@@ -157,32 +174,36 @@ void ui_swapRd(int kb) {
 
 void ui_swapWr(int kb) {
 #ifdef CONFIG_DOS
-  _swapWrKb += kb;
+  _ui.swapWrKb += kb;
 
   char buf[16] = {0};
-  sprintf(buf, "W: %8" PRIu32 "K", _swapWrKb);
+  sprintf(buf, "W: %8" PRIu32 "K", _ui.swapWrKb);
 
   for(int i = 0; buf[i]; ++i)
-    _statusLine[i + 32] = 6U << 8U | (uint16_t)buf[i];
+    _ui.statusLine[i + 32] = 6U << 8U | (uint16_t)buf[i];
 
   _printStatusLine();
 #endif
 }
 
-char ui_getch() {
+bool ui_getch() {
 #ifdef CONFIG_DOS
   if(!kbhit())
-    return 0;
+    return true;
 
-  return getch();
+  char ch = getch();
 
+  ns16550_push(_ui.uart, ch);
 #else
-  char c;
-  if(read(STDERR_FILENO, &c, 1) != 1)
-    return 0;
+  char ch;
+  if(read(STDERR_FILENO, &ch, 1) != 1)
+    return true;
 
-  return c;
+  if(ch)
+    ns16550_push(_ui.uart, ch);
 #endif
+
+  return true;
 }
 
 void ui_putch(char c) {

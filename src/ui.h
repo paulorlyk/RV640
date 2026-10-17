@@ -6,6 +6,7 @@
 #define UI_H_E33E09B534A44C759DC58A0B98093190
 
 #include "cpu/rv.h"
+#include "dev/ns16550a.h"
 
 typedef enum {
   UI_PS_IDLE,
@@ -13,7 +14,7 @@ typedef enum {
   UI_PS_WR,
 } UIPageStatus;
 
-void ui_init();
+void ui_init(Ns16550a *uart);
 void ui_destroy();
 
 void ui_rerender();
@@ -25,7 +26,7 @@ void ui_page_status(UIPageStatus status);
 void ui_swapRd(int kb);
 void ui_swapWr(int kb);
 
-char ui_getch();
+bool ui_getch();
 void ui_putch(char c);
 
 #endif //UI_H_E33E09B534A44C759DC58A0B98093190

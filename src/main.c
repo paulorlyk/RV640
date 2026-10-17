@@ -299,7 +299,7 @@ static void _vmDestroy() {
 }
 
 int main(int argc, char* argv[]) {
-  ui_init();
+  ui_init(&_vm.uart0);
 
   if(!_parseArgs(argc, argv)) {
     _usage(argv[0]);
@@ -426,9 +426,8 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    const char ch = ui_getch();
-    if(ch)
-      ns16550_push(&_vm.uart0, ch);
+    if(!ui_getch())
+      break;
   }
 
 #ifdef MAX_CYCLES
